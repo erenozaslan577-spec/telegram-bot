@@ -10,7 +10,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-BOT_TOKEN = "8674816242:AAEmyovk_71NPXva4ejaYmHrHPSdaeFIc_8"
+BOT_TOKEN = "8674816242:AAEPviDpFQxP2dCWGzB0BGg6ZAcNqQI8YT0"
 ADMIN_USERNAME = "@kralinarest"
 ADMIN_ID = 8674816242
 BOT_USERNAME = "ChiwasIslemBot"
