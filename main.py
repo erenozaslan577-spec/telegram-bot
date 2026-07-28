@@ -24,7 +24,7 @@ logging.basicConfig(
 )
 
 # --- KONFİGÜRASYON ---
-BOT_TOKEN =("8674816242:AAEfxhODvzTKjfRWzdFJ1lWimaYpl_bVezM")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8674816242:AAEfxhODvzTKjfRWzdFJ1lWimaYpl_bVezM")
 ADMIN_USERNAME = "@kralinarest"
 ADMIN_ID = int(os.getenv("ADMIN_ID", "8674816242"))
 BOT_USERNAME = "ChiwasIslenBot"
@@ -92,7 +92,7 @@ def sanitize_input(text: str) -> str:
     return html.escape(text.strip())
 
 def is_rate_limited(user_id: int, limit_seconds: float = 1.0) -> bool:
-    """Buton spamını ve DDoS saldırılarını engeller."""
+    """Buton spamını engeller."""
     now = time.time()
     last_time = rate_limit_store.get(user_id, 0)
     if now - last_time < limit_seconds:
@@ -171,7 +171,7 @@ def get_main_keyboard():
         [InlineKeyboardButton("🛠 Hizmet Seç & Sepet Oluştur", callback_data="select_services")],
         [InlineKeyboardButton("💳 Bakiye / Ödeme Yap", callback_data="purchase"), InlineKeyboardButton("📜 Hizmet Rehberi", callback_data="guide")],
         [InlineKeyboardButton("🎡 Günlük Şans Çarkı", callback_data="daily_wheel"), InlineKeyboardButton("🎟 Promo Kod", callback_data="use_promo")],
-        [InlineKeyboardButton("👥 Referans / Arkadaşın: Getir", callback_data="referral"), InlineKeyboardButton("🔍 Müşteri Yorumları", callback_data="reviews")],
+        [InlineKeyboardButton("👥 Referans / Arkadaşını Getir", callback_data="referral"), InlineKeyboardButton("🔍 Müşteri Yorumları", callback_data="reviews")],
         [InlineKeyboardButton("🛡 Güvenlik & Garanti", callback_data="guarantee"), InlineKeyboardButton("❓ SSS & Bilgi", callback_data="faq")],
         [InlineKeyboardButton("👤 Profilim & Geçmiş", callback_data="profile"), InlineKeyboardButton("📍 Sipariş Takip", callback_data="track_order")],
         [InlineKeyboardButton("💬 Canlı Destek & İletişim", url=f"https://t.me/{ADMIN_USERNAME.replace('@', '')}")]
@@ -179,7 +179,7 @@ def get_main_keyboard():
 
 def get_welcome_text(first_name):
     return (
-        f"<b>CHIWAS VIP SERVICES - RESMI OTOMASYON BOTU</b>\n"
+        f"<b>CHIWAS VIP SERVICES - RESMİ OTOMASYON BOTU</b>\n"
         f"--------------------------------------------\n"
         f"👋 Hoş Geldiniz, Sayın <b>{first_name}</b>\n\n"
         f"🛡 <b>%100 Anonimlik & VIP Güvenlik Kalkanı</b>\n"
@@ -259,9 +259,7 @@ def build_service_keyboard(cart, express):
     price_tl = calculate_price(count, express)
     keyboard.append([InlineKeyboardButton(f"🛒 Sepeti Onayla ({count} İşlem - {price_tl} TL)", callback_data="checkout")])
     keyboard.append([InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")])
-    return InlineKeyboardMarkup(keyboard)
-
-# --- CONVERSATION HANDLERS ---
+    return InlineKeyboardMarkup(keyboard)# --- CONVERSATION HANDLERS ---
 async def start_target_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -284,9 +282,9 @@ async def receive_target_info(update: Update, context: ContextTypes.DEFAULT_TYPE
     text = (
         f"💳 <b>ÖDENECEK NET TUTAR:</b> {final_price} TL\n\n"
         f"📌 <b>IBAN İLE ÖDEME</b> (Kopyalamak için üzerlerine dokunun):\n"
-        f"🌐 <b>IBAN:</b> <code>TR100006200091E03606596709</code>\n"
+        f"🌐 <b>IBAN:</b> <code>TR10 0006 2000 9100 0006 9697 09</code>\n"
         f"👤 <b>Alıcı:</b> <code>Garanti Ödeme ve Elektronik Para Hizmetleri A.Ş.</code>\n"
-        f"📝 <b>Açıklama:</b> <code>TAM77869862578T012</code>\n\n"
+        f"📝 <b>Açıklama:</b> <code>TAMİ7786986257878012</code>\n\n"
         f"🛡 <b>GÜVENLİK ŞARTI:</b> Lütfen ödemeyi yaptıktan sonra <b>Ödeme Dekontunun FOTOĞRAFINI (Ekran Görüntüsü)</b> bu sohbete gönderin."
     )
     await update.message.reply_text(text, parse_mode="HTML")
@@ -411,7 +409,7 @@ async def start_track_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     await query.edit_message_text(
-        "🔍 <b>SİPARİŞ DURUMU SORUGULAWA</b>\n--------------------------------------------\nLütfen 5 haneli <b>Takip Kodunuzu</b> yazın:",
+        "🔍 <b>SİPARİŞ DURUMU SORUGULAMA</b>\n--------------------------------------------\nLütfen 5 haneli <b>Takip Kodunuzu</b> (Örn: CHW-12345) yazın:",
         parse_mode="HTML"
     )
     return WAITING_TRACKING
@@ -479,56 +477,73 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 cart.remove(idx)
             else:
                 cart.add(idx)
-        await query.edit_message_reply_markup(reply_markup=build_service_keyboard(cart, context.user_data['express']))
+        await query.edit_message_text("🛠 <b>HİZMET SEÇİM PANELİ</b>\n\nLütfen paketlerinizi belirleyin:", reply_markup=build_service_keyboard(cart, express), parse_mode="HTML")
 
     elif data == "select_all":
         context.user_data['cart'] = set(range(len(SERVICES)))
-        await query.edit_message_reply_markup(reply_markup=build_service_keyboard(context.user_data['cart'], express))
+        await query.edit_message_text("🛠 <b>HİZMET SEÇİM PANELİ</b>\n\nLütfen paketlerinizi belirleyin:", reply_markup=build_service_keyboard(context.user_data['cart'], express), parse_mode="HTML")
 
     elif data == "select_none":
         context.user_data['cart'] = set()
-        await query.edit_message_reply_markup(reply_markup=build_service_keyboard(context.user_data['cart'], express))
+        await query.edit_message_text("🛠 <b>HİZMET SEÇİM PANELİ</b>\n\nLütfen paketlerinizi belirleyin:", reply_markup=build_service_keyboard(context.user_data['cart'], express), parse_mode="HTML")
 
     elif data == "checkout":
         if not cart:
             await query.answer("⚠️ Lütfen en az 1 hizmet seçin!", show_alert=True)
             return
 
-        selected_services = [SERVICES[i] for i in cart]
+        selected_services = [SERVICES[i] for i in sorted(list(cart))]
         count = len(selected_services)
         raw_price = calculate_price(count, express)
 
         u_data = get_user_data(user.id)
         balance = u_data.get("balance", 0)
 
-        used_discount = min(balance, raw_price)
-        final_price = raw_price - used_discount
+        discount_applied = min(balance, raw_price)
+        final_price = raw_price - discount_applied
 
         context.user_data['pending_order'] = {
-            'services': selected_services,
             'count': count,
-            'express': express,
+            'services': selected_services,
             'raw_price': raw_price,
-            'used_discount': used_discount,
+            'used_discount': discount_applied,
             'final_price': final_price
         }
 
-        checkout_btn = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ Siparişi Onayla & Ödeme Yap", callback_data="start_target_info_flow")],
-            [InlineKeyboardButton("🔙 Seçimlere Dön", callback_data="select_services")]
-        ])
-
-        msg = (
-            f"🛒 <b>SEPET ÖZETİ VE ÖDEME</b>\n--------------------------------------------\n"
-            f"📋 <b>Seçilen Hizmetler ({count} Adet):</b>\n" +
-            "\n".join([f"• {s}" for s in selected_services]) +
-            f"\n\n🚀 <b>Express Hızlı Teslimat:</b> {'EVET' if express else 'HAYIR'}\n"
-            f"💵 <b>Hizmet Tutarı:</b> {raw_price} TL\n"
-            f"🎟 <b>Kullanılan Bakiye/İndirim:</b> -{used_discount} TL\n"
-            f"💰 <b>ÖDENECEK TOPLAM TUTAR:</b> {final_price} TL\n\n"
-            f"<i>Devam etmek için aşağıdaki butona tıklayın.</i>"
+        summary_text = (
+            f"🛒 <b>SEPET ÖZETİ & SEÇİLEN İŞLEMLER</b>\n--------------------------------------------\n"
+            + "\n".join([f"• {s}" for s in selected_services]) + "\n\n"
+            f"⚡️ <b>Express Teslimat:</b> {'EVET (+300 TL)' if express else 'HAYIR'}\n"
+            f"💰 <b>Tutar:</b> {raw_price} TL\n"
+            f"🎁 <b>Kullanılan Bakiye İndirimi:</b> -{discount_applied} TL\n"
+            f"💳 <b>Ödenecek Net Tutar:</b> {final_price} TL\n\n"
+            f"İşleme devam etmek istiyor musunuz?"
         )
-        await query.edit_message_text(msg, reply_markup=checkout_btn, parse_mode="HTML")
+
+        btn = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Siparişi Tamamla & Öde", callback_data="proceed_target")],
+            [InlineKeyboardButton("🔙 Sepeti Düzenle", callback_data="select_services")]
+        ])
+        await query.edit_message_text(summary_text, reply_markup=btn, parse_mode="HTML")
+
+    elif data == "purchase":
+        text = (
+            f"💳 <b>BAKİYE YÜKLEME & DİREKT ÖDEME</b>\n--------------------------------------------\n"
+            f"İstediğiniz tutarda ödeme yapmak için aşağıdaki IBAN bilgilerini kullanabilirsiniz:\n\n"
+            f"🌐 <b>IBAN:</b> <code>TR10 0006 2000 9100 0006 9697 09</code>\n"
+            f"👤 <b>Alıcı:</b> <code>Garanti Ödeme ve Elektronik Para Hizmetleri A.Ş.</code>\n"
+            f"📝 <b>Açıklama:</b> <code>TAMİ7786986257878012</code>\n\n"
+            f"📌 <i>Metinlere dokunarak kolayca kopyalayabilirsiniz. Ödeme yaptıktan sonra dekontunuzu Destek ekibimize iletebilirsiniz.</i>"
+        )
+        btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]])
+        await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
+
+    elif data == "guide":
+        text = "📜 <b>HİZMET KATALOĞU VE AÇIKLAMALARI</b>\n--------------------------------------------\n\n"
+        for i, name in enumerate(SERVICES):
+            text += f"<b>{name}</b>\n└ <i>{SERVICE_DETAILS.get(i, 'Açıklama mevcut değil.')}</i>\n\n"
+        btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]])
+        await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
 
     elif data == "daily_wheel":
         u_data = get_user_data(user.id)
@@ -544,80 +559,189 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.answer(f"⏳ Çarkı tekrar çevirmek için {hours} saat {minutes} dakika beklemelisiniz!", show_alert=True)
                 return
 
-        rewards = [10, 20, 50, 100, 0, 15]
-        won = random.choice(rewards)
-
-        u_data["balance"] = u_data.get("balance", 0) + won
+        reward = random.choice([50, 100, 150, 200, 250])
+        u_data["balance"] = u_data.get("balance", 0) + reward
         u_data["last_wheel"] = now.strftime("%Y-%m-%d %H:%M:%S")
-        save_json(DATA_FILE, load_json(DATA_FILE) | {str(user.id): u_data})
 
-        await query.answer(f"🎉 TEBRİKLER! Çarktan {won} TL bakiye kazandınız!", show_alert=True)
-        await query.edit_message_text(get_welcome_text(sanitize_input(user.first_name)), reply_markup=get_main_keyboard(), parse_mode="HTML")
+        update_user_data(user.id, "balance", u_data["balance"])
+        update_user_data(user.id, "last_wheel", u_data["last_wheel"])
+
+        text = (
+            f"🎡 <b>GÜNLÜK ŞANS ÇARKI ÇEVRİLDİ!</b>\n--------------------------------------------\n"
+            f"🎉 Tebrikler! Çarktan <b>+{reward} TL</b> bakiye kazandınız!\n"
+            f"💰 Yeni Bakiyeniz: <b>{u_data['balance']} TL</b>\n\n"
+            f"⏰ 24 Saat sonra tekrar şansınızı deneyebilirsiniz."
+        )
+        btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]])
+        await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
+
+    elif data == "referral":
+        u_data = get_user_data(user.id)
+        ref_link = f"https://t.me/{BOT_USERNAME}?start=CHW-{user.id}"
+        text = (
+            f"👥 <b>REFERANS VE KAZANÇ SİSTEMİ</b>\n--------------------------------------------\n"
+            f"Davet ettiğiniz her kullanıcı için anında <b>+{REFERRAL_REWARD} TL</b> kazanın!\n\n"
+            f"📊 <b>İstatistikleriniz:</b>\n"
+            f"• Toplam Davet: <b>{u_data.get('invited_count', 0)} Kişi</b>\n"
+            f"• Toplam Kazanç: <b>{u_data.get('invited_count', 0) * REFERRAL_REWARD} TL</b>\n\n"
+            f"🔗 <b>Özel Davet Linkiniz:</b>\n<code>{ref_link}</code>"
+        )
+        btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]])
+        await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
+
+    elif data == "reviews":
+        text = (
+            f"🔍 <b>MÜŞTERİ YORUMLARI & GERİ BİLDİRİMLER</b>\n--------------------------------------------\n"
+            f"⭐ <b>@m****:</b> <i>'Instagram alma işlemi 15 dakikada bitti, teşekkürler.'</i>\n\n"
+            f"⭐ <b>@a****:</b> <i>'Canlı konum tespiti %100 doğru nokta verdi, VIP hız muazzam.'</i>\n\n"
+            f"⭐ <b>@k****:</b> <i>'WhatsApp sızma işleminde şüphelerim vardı ama dekont onayından sonra hemen iletildi.'</i>\n\n"
+            f"📌 Güncel kanıtlar ve canlı yorumlar için duyuru kanalımızı takip edebilirsiniz."
+        )
+        btn = InlineKeyboardMarkup([[InlineKeyboardButton("📢 Duyuru Kanalı", url=f"https://t.me/{REQUIRED_CHANNEL.replace('@', '')}"), InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]])
+        await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
+
+    elif data == "guarantee":
+        text = (
+            f"🛡 <b>GÜVENLİK & GARANTİ ŞARTLARI</b>\n--------------------------------------------\n"
+            f"1️⃣ <b>Uçtan Uca Gizlilik:</b> Tüm sunucu logları işlem sonrası otomatik silinir.\n"
+            f"2️⃣ <b>Tam İade Garantisi:</b> Başarısız olan işlemlerde bakiyeniz anında iade edilir.\n"
+            f"3️⃣ <b>Anonimlik:</b> Hedef kişinin işlemden haberdar olması teknik olarak imkansızdır.\n"
+            f"4️⃣ <b>7/24 Kesintisiz Destek:</b> VIP Müşteri Hizmetlerimiz sürekli aktiftir."
+        )
+        btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]])
+        await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
+
+    elif data == "faq":
+        text = (
+            f"❓ <b>SIKÇA SORULAN SORULAR</b>\n--------------------------------------------\n"
+            f"<b>S: İşlemler ne kadar sürer?</b>\n"
+            f"C: Standart işlemler 1-3 saat, Express işlemler 15-30 dakika sürer.\n\n"
+            f"<b>S: Ödeme yaptıktan sonra ne yapmalıyım?</b>\n"
+            f"C: Sipariş adımlarını takip edip dekont fotoğrafınızı sisteme yüklemeniz yeterlidir.\n\n"
+            f"<b>S: Hedef taraf bildirimi alır mı?</b>\n"
+            f"C: Hayır, uyguladığımız sistem tamamen sızma tabanlıdır."
+        )
+        btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]])
+        await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
 
     elif data == "profile":
         u_data = get_user_data(user.id)
-        history_text = "\n".join(u_data.get("history", [])) if u_data.get("history") else "Henüz siparişiniz yok."
-        profile_msg = (
-            f"👤 <b>KULLANICI PROFİLİ</b>\n--------------------------------------------\n"
-            f"🆔 <b>ID:</b> <code>{user.id}</code>\n"
-            f"💵 <b>Mevcut Bakiye:</b> {u_data.get('balance', 0)} TL\n"
-            f"👥 <b>Davet Edilen:</b> {u_data.get('invited_count', 0)} kişi\n\n"
-            f"📜 <b>Sipariş Geçmişi:</b>\n{history_text}"
-        )
-        await query.edit_message_text(profile_msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]]), parse_mode="HTML")
+        history = u_data.get("history", [])
+        hist_text = "\n".join([f"• {h}" for h in history[-5:]]) if history else "Henüz siparişiniz bulunmuyor."
 
-    elif data == "referral":
-        ref_link = f"https://t.me/{BOT_USERNAME}?start=CHW-{user.id}"
-        ref_msg = (
-            f"👥 <b>KULLANICI KAZANÇ PROTOKOLÜ (REFERANS)</b>\n--------------------------------------------\n"
-            f"Aşağıdaki özel davet bağlantınızı arkadaşlarınızla paylaşarak her katılımda <b>+{REFERRAL_REWARD} TL Bakiye</b> kazanın!\n\n"
-            f"🔗 <b>Davet Linkiniz:</b>\n<code>{ref_link}</code>"
+        text = (
+            f"👤 <b>MÜŞTERİ PROFİLİ</b>\n--------------------------------------------\n"
+            f"🆔 <b>Kullanıcı ID:</b> <code>{user.id}</code>\n"
+            f"💰 <b>Mevcut Bakiye:</b> {u_data.get('balance', 0)} TL\n"
+            f"👥 <b>Davet Sayısı:</b> {u_data.get('invited_count', 0)}\n\n"
+            f"📜 <b>Son Sipariş Geçmişi:</b>\n{hist_text}"
         )
-        await query.edit_message_text(ref_msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]]), parse_mode="HTML")
+        btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]])
+        await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
 
     elif data.startswith("adm_"):
         if user.id != ADMIN_ID:
-            await query.answer("❌ Bu işlemi sadece yöneticiler yapabilir!", show_alert=True)
             return
 
         parts = data.split("_")
         action = parts[1]
-        target_uid = int(parts[2])
 
         if action == "approve":
-            track_code = parts[3]
+            target_uid = int(parts[2])
+            t_code = parts[3]
             orders = load_json(ORDERS_FILE)
-            if track_code in orders:
-                orders[track_code]["status_text"] = "✅ Onaylandı / İşleme Alındı"
-                orders[track_code]["percent"] = "50"
+            if t_code in orders:
+                orders[t_code]["status_text"] = "İşleme Alındı / Hazırlanıyor"
+                orders[t_code]["percent"] = "50"
                 save_json(ORDERS_FILE, orders)
 
             try:
-                await context.bot.send_message(target_uid, f"✅ <b>MÜJDE! #{track_code}</b> numaralı ödemeniz onaylandı ve işleminiz başlatıldı!", parse_mode="HTML")
+                await context.bot.send_message(
+                    chat_id=target_uid,
+                    text=f"✅ <b>SİPARİŞİNİZ ONAYLANDI!</b>\n\n#{t_code} kodlu siparişinizin ödemesi doğrulandı ve işlem başlatıldı.",
+                    parse_mode="HTML"
+                )
             except Exception:
                 pass
-            await query.edit_message_caption(caption=query.message.caption + "\n\n🟢 <b>DURUM: ONAYLANDI</b>")
+            await query.edit_message_caption(caption=f"{query.message.caption}\n\n✅ <b>ONAYLANDI</b>")
 
         elif action == "reject":
-            track_code = parts[3]
+            target_uid = int(parts[2])
+            t_code = parts[3]
+            orders = load_json(ORDERS_FILE)
+            if t_code in orders:
+                orders[t_code]["status_text"] = "Ödeme İptal Edildi / Reddedildi"
+                save_json(ORDERS_FILE, orders)
+
             try:
-                await context.bot.send_message(target_uid, f"❌ <b>ÖDEME REDDEDİLDİ! #{track_code}</b> dekontunuz geçersiz görüldü.", parse_mode="HTML")
+                await context.bot.send_message(
+                    chat_id=target_uid,
+                    text=f"❌ <b>ÖDEMENİZ REDDEDİLDİ!</b>\n\n#{t_code} kodlu siparişin dekontu geçersiz görüldü.",
+                    parse_mode="HTML"
+                )
             except Exception:
                 pass
-            await query.edit_message_caption(caption=query.message.caption + "\n\n🔴 <b>DURUM: REDDEDİLDİ</b>")
+            await query.edit_message_caption(caption=f"{query.message.caption}\n\n❌ <b>REDDEDİLDİ</b>")
 
         elif action == "quickban":
+            target_uid = int(parts[2])
             banned = load_json(BANNED_FILE)
             banned[str(target_uid)] = True
             save_json(BANNED_FILE, banned)
-            await query.answer("🚫 Kullanıcı engellendi!", show_alert=True)
+            await query.edit_message_caption(caption=f"{query.message.caption}\n\n🚫 <b>KULLANICI ENGELLENDİ</b>")# --- YÖNETİCİ KOMUTLARI ---
+async def admin_add_coupon(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
 
-# --- ANA ÇALIŞTIRMA FONKSİYONU ---
+    try:
+        code = context.args[0].upper()
+        amount = int(context.args[1])
+        limit = int(context.args[2])
+
+        coupons = load_json(COUPONS_FILE)
+        coupons[code] = {"amount": amount, "limit": limit, "used_by": []}
+        save_json(COUPONS_FILE, coupons)
+
+        await update.message.reply_text(f"✅ <b>Kupon Oluşturuldu:</b> <code>{code}</code>\n💰 Tutar: {amount} TL\n👥 Limit: {limit} Kullanım", parse_mode="HTML")
+    except Exception:
+        await update.message.reply_text("⚠️ Kullanım: `/addcoupon <KOD> <MİKTAR> <LİMİT>`", parse_mode="HTML")
+
+# --- MAIN UYGULAMA ---
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
+    # Conversation Handlers
     target_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(start_target_info, pattern="^start_target_info_flow$")],
+        entry_points=[CallbackQueryHandler(start_target_info, pattern="^proceed_target$")],
+        states={
+            WAITING_TARGET_INFO: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_target_info)],
+            WAITING_DEKONT: [MessageHandler(filters.PHOTO, receive_dekont)]
+        },
+        # --- YÖNETİCİ KOMUTLARI ---
+async def admin_add_coupon(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    try:
+        code = context.args[0].upper()
+        amount = int(context.args[1])
+        limit = int(context.args[2])
+
+        coupons = load_json(COUPONS_FILE)
+        coupons[code] = {"amount": amount, "limit": limit, "used_by": []}
+        save_json(COUPONS_FILE, coupons)
+
+        await update.message.reply_text(f"✅ <b>Kupon Oluşturuldu:</b> <code>{code}</code>\n💰 Tutar: {amount} TL\n👥 Limit: {limit} Kullanım", parse_mode="HTML")
+    except Exception:
+        await update.message.reply_text("⚠️ Kullanım: `/addcoupon <KOD> <MİKTAR> <LİMİT>`", parse_mode="HTML")
+
+# --- MAIN UYGULAMA ---
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+
+    # Conversation Handlers
+    target_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(start_target_info, pattern="^proceed_target$")],
         states={
             WAITING_TARGET_INFO: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_target_info)],
             WAITING_DEKONT: [MessageHandler(filters.PHOTO, receive_dekont)]
@@ -642,12 +766,15 @@ def main():
     )
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("addcoupon", admin_add_coupon))
+
     app.add_handler(target_conv)
     app.add_handler(promo_conv)
     app.add_handler(track_conv)
+
     app.add_handler(CallbackQueryHandler(handle_callback))
 
-    logging.info("Bot başlatılıyor...")
+    logging.info("Bot başarıyla başlatıldı ve dinlemeye geçti.")
     app.run_polling()
 
 if __name__ == "__main__":
