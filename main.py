@@ -717,35 +717,6 @@ def main():
             WAITING_TARGET_INFO: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_target_info)],
             WAITING_DEKONT: [MessageHandler(filters.PHOTO, receive_dekont)]
         },
-        # --- YÖNETİCİ KOMUTLARI ---
-async def admin_add_coupon(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-
-    try:
-        code = context.args[0].upper()
-        amount = int(context.args[1])
-        limit = int(context.args[2])
-
-        coupons = load_json(COUPONS_FILE)
-        coupons[code] = {"amount": amount, "limit": limit, "used_by": []}
-        save_json(COUPONS_FILE, coupons)
-
-        await update.message.reply_text(f"✅ <b>Kupon Oluşturuldu:</b> <code>{code}</code>\n💰 Tutar: {amount} TL\n👥 Limit: {limit} Kullanım", parse_mode="HTML")
-    except Exception:
-        await update.message.reply_text("⚠️ Kullanım: `/addcoupon <KOD> <MİKTAR> <LİMİT>`", parse_mode="HTML")
-
-# --- MAIN UYGULAMA ---
-def main():
-    app = Application.builder().token(BOT_TOKEN).build()
-
-    # Conversation Handlers
-    target_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(start_target_info, pattern="^proceed_target$")],
-        states={
-            WAITING_TARGET_INFO: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_target_info)],
-            WAITING_DEKONT: [MessageHandler(filters.PHOTO, receive_dekont)]
-        },
         fallbacks=[CommandHandler("cancel", cancel_conv)]
     )
 
