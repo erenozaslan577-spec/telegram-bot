@@ -166,12 +166,6 @@ async def check_channel_membership(user_id, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         return True
 
-async def notify_admin(context: ContextTypes.DEFAULT_TYPE, message: str, reply_markup=None):
-    try:
-        await context.bot.send_message(chat_id=ADMIN_ID, text=message, reply_markup=reply_markup, parse_mode="HTML")
-    except Exception as e:
-        logging.error(f"Admin bildirim hatasi: {e}")
-
 def get_main_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🛠 Hizmet Seç & Sepet Oluştur", callback_data="select_services")],
@@ -199,7 +193,6 @@ def get_welcome_text(first_name):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
-    # Ban Kontrolü
     if is_banned(user.id):
         await update.message.reply_text("❌ <b>Erişiminiz Engellendi!</b>\nGüvenlik ihlali nedeniyle bota erişiminiz kısıtlanmıştır.", parse_mode="HTML")
         return
@@ -208,7 +201,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['cart'] = set()
     context.user_data['express'] = False
 
-    # Force Join Kontrolü
     is_member = await check_channel_membership(user.id, context)
     if not is_member:
         btn = InlineKeyboardMarkup([
@@ -269,52 +261,6 @@ def build_service_keyboard(cart, express):
     keyboard.append([InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")])
     return InlineKeyboardMarkup(keyboard)
 
-# --- ADMİN GÜVENLİK & YÖNETİM KOMUTLARI ---
-async def admin_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    if not context.args:
-        await update.message.reply_text("⚠️ Kullanım: <code>/ban &lt;user_id&gt;</code>", parse_mode="HTML")
-        return
-    target_id = context.args[0]
-    banned = load_json(BANNED_FILE)
-    banned[target_id] = str(datetime.now())
-    save_json(BANNED_FILE, banned)
-    await update.message.reply_text(f"🚫 <code>{target_id}</code> ID'li kullanıcı başarıyla BANLANDI.", parse_mode="HTML")
-
-async def admin_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    if not context.args:
-        await update.message.reply_text("⚠️ Kullanım: <code>/unban &lt;user_id&gt;</code>", parse_mode="HTML")
-        return
-    target_id = context.args[0]
-    banned = load_json(BANNED_FILE)
-    if target_id in banned:
-        del banned[target_id]
-        save_json(BANNED_FILE, banned)
-        await update.message.reply_text(f"✅ <code>{target_id}</code> ID'li kullanıcının banı kaldırıldı.", parse_mode="HTML")
-    else:
-        await update.message.reply_text("❌ Kullanıcı banlı değil.")
-
-async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-
-    admin_text = (
-        "👑 <b>CHIWAS ADVANCED YÖNETİCİ & GÜVENLİK PANELİ</b>\n"
-        "-----------------------------------------\n"
-        "📊 <code>/istatistik</code> - Sistem istatistikleri.\n"
-        "📢 <code>/duyuru &lt;mesaj&gt;</code> - Toplu duyuru.\n"
-        "💳 <code>/bakiye_ekle &lt;user_id&gt; &lt;miktar&gt;</code> - Bakiye yükle.\n"
-        "🔻 <code>/bakiye_sil &lt;user_id&gt; &lt;miktar&gt;</code> - Bakiye düş.\n"
-        "🚫 <code>/ban &lt;user_id&gt;</code> - Kullanıcıyı bota engelle.\n"
-        "✅ <code>/unban &lt;user_id&gt;</code> - Engeli kaldır.\n"
-        "🎟️ <code>/kod_olustur &lt;KOD&gt; &lt;TUTAR&gt; &lt;LIMIT&gt;</code> - Promo kod.\n"
-        "📈 <code>/durum_guncelle &lt;TAKIP_KODU&gt; &lt;YUZDE&gt; &lt;MESAJ&gt;</code> - Sipariş güncelle."
-    )
-    await update.message.reply_text(admin_text, parse_mode="HTML")
-
 # --- CONVERSATION HANDLERS ---
 async def start_target_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -351,7 +297,6 @@ async def receive_dekont(update: Update, context: ContextTypes.DEFAULT_TYPE):
     u_data = get_user_data(user.id)
     order = context.user_data.get('pending_order', {})
 
-    # Fotoğraf Zorunluluğu Kontrolü (Güvenlik Kalkanı)
     if not update.message.photo:
         await update.message.reply_text(
             "⚠️ <b>GÜVENLİK UYARISI:</b> Sadece ödeme dekontunun <b>FOTOĞRAFINI</b> kabul ediyoruz. Metin kabul edilmez. Lütfen fotoğraf gönderin!",
@@ -473,3 +418,64 @@ async def start_track_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return WAITING_TRACKING
 
 async def receive_track_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    code = sanitize_input(update.message.text.strip().upper())
+    orders = load_json(ORDERS_FILE)
+
+    if code in orders:
+        ord_info = orders[code]
+        status_msg = (
+            f"🔍 <b>SİPARİŞ DETAYLARI: #{code}</b>\n-----------------------------------------\n"
+            f"📅 <b>Tarih:</b> {ord_info.get('date', 'N/A')}\n"
+            f"🎯 <b>Hedef:</b> <code>{ord_info.get('target_info', 'Gizli')}</code>\n"
+            f"📊 <b>İlerleme:</b> %{ord_info.get('percent', '0')}\n"
+            f"📌 <b>Durum:</b> {ord_info.get('status_text', 'İşleniyor')}\n\n"
+            f"🛠 <b>Hizmetler:</b>\n" + "\n".join(ord_info.get('services', []))
+        )
+        await update.message.reply_text(status_msg, reply_markup=get_main_keyboard(), parse_mode="HTML")
+    else:
+        await update.message.reply_text("❌ Girilen takip koduna ait sipariş bulunamadı!", reply_markup=get_main_keyboard())
+
+    return ConversationHandler.END
+
+async def cancel_conv(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("❌ İşlem iptal edildi.", reply_markup=get_main_keyboard())
+    return ConversationHandler.END
+
+# --- BUTON TIKLAMA (CALLBACK QUERY) HANDLER ---
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user = update.effective_user
+    data = query.data
+
+    if is_banned(user.id):
+        await query.answer("❌ Engellendiniz!", show_alert=True)
+        return
+
+    if is_rate_limited(user.id):
+        await query.answer("⚠️ Lütfen çok hızlı tıklamayın!", show_alert=True)
+        return
+
+    await query.answer()
+
+    cart = context.user_data.setdefault('cart', set())
+    express = context.user_data.setdefault('express', False)
+
+    if data == "back_main":
+        await query.edit_message_text(get_welcome_text(sanitize_input(user.first_name)), reply_markup=get_main_keyboard(), parse_mode="HTML")
+
+    elif data == "check_join":
+        is_member = await check_channel_membership(user.id, context)
+        if is_member:
+            await query.edit_message_text(get_welcome_text(sanitize_input(user.first_name)), reply_markup=get_main_keyboard(), parse_mode="HTML")
+        else:
+            await query.answer("❌ Kanala henüz katılmadınız!", show_alert=True)
+
+    elif data == "select_services":
+        await query.edit_message_text("🛠 <b>HİZMET SEÇİM PANELİ</b>\nLütfen paketlerinizi belirleyin:", reply_markup=build_service_keyboard(cart, express), parse_mode="HTML")
+
+    elif data.startswith("toggle_"):
+        idx = int(data.split("_")[1])
+        if idx in cart:
+            cart.remove(idx)
+        else:
+            c
