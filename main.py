@@ -438,9 +438,7 @@ async def receive_track_code(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def cancel_conv(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ İşlem iptal edildi.", reply_markup=get_main_keyboard())
-    return ConversationHandler.END
-
-# --- BUTON TIKLAMA (CALLBACK QUERY) HANDLER ---
+    return ConversationHandler.END# --- BUTON TIKLAMA (CALLBACK QUERY) HANDLER ---
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user = update.effective_user
@@ -480,4 +478,177 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if idx in cart:
                 cart.remove(idx)
             else:
-                car
+                cart.add(idx)
+        await query.edit_message_reply_markup(reply_markup=build_service_keyboard(cart, context.user_data['express']))
+
+    elif data == "select_all":
+        context.user_data['cart'] = set(range(len(SERVICES)))
+        await query.edit_message_reply_markup(reply_markup=build_service_keyboard(context.user_data['cart'], express))
+
+    elif data == "select_none":
+        context.user_data['cart'] = set()
+        await query.edit_message_reply_markup(reply_markup=build_service_keyboard(context.user_data['cart'], express))
+
+    elif data == "checkout":
+        if not cart:
+            await query.answer("⚠️ Lütfen en az 1 hizmet seçin!", show_alert=True)
+            return
+
+        selected_services = [SERVICES[i] for i in cart]
+        count = len(selected_services)
+        raw_price = calculate_price(count, express)
+
+        u_data = get_user_data(user.id)
+        balance = u_data.get("balance", 0)
+
+        used_discount = min(balance, raw_price)
+        final_price = raw_price - used_discount
+
+        context.user_data['pending_order'] = {
+            'services': selected_services,
+            'count': count,
+            'express': express,
+            'raw_price': raw_price,
+            'used_discount': used_discount,
+            'final_price': final_price
+        }
+
+        checkout_btn = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Siparişi Onayla & Ödeme Yap", callback_data="start_target_info_flow")],
+            [InlineKeyboardButton("🔙 Seçimlere Dön", callback_data="select_services")]
+        ])
+
+        msg = (
+            f"🛒 <b>SEPET ÖZETİ VE ÖDEME</b>\n--------------------------------------------\n"
+            f"📋 <b>Seçilen Hizmetler ({count} Adet):</b>\n" +
+            "\n".join([f"• {s}" for s in selected_services]) +
+            f"\n\n🚀 <b>Express Hızlı Teslimat:</b> {'EVET' if express else 'HAYIR'}\n"
+            f"💵 <b>Hizmet Tutarı:</b> {raw_price} TL\n"
+            f"🎟 <b>Kullanılan Bakiye/İndirim:</b> -{used_discount} TL\n"
+            f"💰 <b>ÖDENECEK TOPLAM TUTAR:</b> {final_price} TL\n\n"
+            f"<i>Devam etmek için aşağıdaki butona tıklayın.</i>"
+        )
+        await query.edit_message_text(msg, reply_markup=checkout_btn, parse_mode="HTML")
+
+    elif data == "daily_wheel":
+        u_data = get_user_data(user.id)
+        last_wheel = u_data.get("last_wheel")
+        now = datetime.now()
+
+        if last_wheel:
+            last_date = datetime.strptime(last_wheel, "%Y-%m-%d %H:%M:%S")
+            if now - last_date < timedelta(hours=24):
+                remaining = timedelta(hours=24) - (now - last_date)
+                hours, remainder = divmod(remaining.seconds, 3600)
+                minutes, _ = divmod(remainder, 60)
+                await query.answer(f"⏳ Çarkı tekrar çevirmek için {hours} saat {minutes} dakika beklemelisiniz!", show_alert=True)
+                return
+
+        rewards = [10, 20, 50, 100, 0, 15]
+        won = random.choice(rewards)
+
+        u_data["balance"] = u_data.get("balance", 0) + won
+        u_data["last_wheel"] = now.strftime("%Y-%m-%d %H:%M:%S")
+        save_json(DATA_FILE, load_json(DATA_FILE) | {str(user.id): u_data})
+
+        await query.answer(f"🎉 TEBRİKLER! Çarktan {won} TL bakiye kazandınız!", show_alert=True)
+        await query.edit_message_text(get_welcome_text(sanitize_input(user.first_name)), reply_markup=get_main_keyboard(), parse_mode="HTML")
+
+    elif data == "profile":
+        u_data = get_user_data(user.id)
+        history_text = "\n".join(u_data.get("history", [])) if u_data.get("history") else "Henüz siparişiniz yok."
+        profile_msg = (
+            f"👤 <b>KULLANICI PROFİLİ</b>\n--------------------------------------------\n"
+            f"🆔 <b>ID:</b> <code>{user.id}</code>\n"
+            f"💵 <b>Mevcut Bakiye:</b> {u_data.get('balance', 0)} TL\n"
+            f"👥 <b>Davet Edilen:</b> {u_data.get('invited_count', 0)} kişi\n\n"
+            f"📜 <b>Sipariş Geçmişi:</b>\n{history_text}"
+        )
+        await query.edit_message_text(profile_msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]]), parse_mode="HTML")
+
+    elif data == "referral":
+        ref_link = f"https://t.me/{BOT_USERNAME}?start=CHW-{user.id}"
+        ref_msg = (
+            f"👥 <b>KULLANICI KAZANÇ PROTOKOLÜ (REFERANS)</b>\n--------------------------------------------\n"
+            f"Aşağıdaki özel davet bağlantınızı arkadaşlarınızla paylaşarak her katılımda <b>+{REFERRAL_REWARD} TL Bakiye</b> kazanın!\n\n"
+            f"🔗 <b>Davet Linkiniz:</b>\n<code>{ref_link}</code>"
+        )
+        await query.edit_message_text(ref_msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]]), parse_mode="HTML")
+
+    elif data.startswith("adm_"):
+        if user.id != ADMIN_ID:
+            await query.answer("❌ Bu işlemi sadece yöneticiler yapabilir!", show_alert=True)
+            return
+
+        parts = data.split("_")
+        action = parts[1]
+        target_uid = int(parts[2])
+
+        if action == "approve":
+            track_code = parts[3]
+            orders = load_json(ORDERS_FILE)
+            if track_code in orders:
+                orders[track_code]["status_text"] = "✅ Onaylandı / İşleme Alındı"
+                orders[track_code]["percent"] = "50"
+                save_json(ORDERS_FILE, orders)
+
+            try:
+                await context.bot.send_message(target_uid, f"✅ <b>MÜJDE! #{track_code}</b> numaralı ödemeniz onaylandı ve işleminiz başlatıldı!", parse_mode="HTML")
+            except Exception:
+                pass
+            await query.edit_message_caption(caption=query.message.caption + "\n\n🟢 <b>DURUM: ONAYLANDI</b>")
+
+        elif action == "reject":
+            track_code = parts[3]
+            try:
+                await context.bot.send_message(target_uid, f"❌ <b>ÖDEME REDDEDİLDİ! #{track_code}</b> dekontunuz geçersiz görüldü.", parse_mode="HTML")
+            except Exception:
+                pass
+            await query.edit_message_caption(caption=query.message.caption + "\n\n🔴 <b>DURUM: REDDEDİLDİ</b>")
+
+        elif action == "quickban":
+            banned = load_json(BANNED_FILE)
+            banned[str(target_uid)] = True
+            save_json(BANNED_FILE, banned)
+            await query.answer("🚫 Kullanıcı engellendi!", show_alert=True)
+
+# --- ANA ÇALIŞTIRMA FONKSİYONU ---
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+
+    target_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(start_target_info, pattern="^start_target_info_flow$")],
+        states={
+            WAITING_TARGET_INFO: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_target_info)],
+            WAITING_DEKONT: [MessageHandler(filters.PHOTO, receive_dekont)]
+        },
+        fallbacks=[CommandHandler("cancel", cancel_conv)]
+    )
+
+    promo_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(start_use_promo, pattern="^use_promo$")],
+        states={
+            WAITING_PROMO: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_promo)]
+        },
+        fallbacks=[CommandHandler("cancel", cancel_conv)]
+    )
+
+    track_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(start_track_order, pattern="^track_order$")],
+        states={
+            WAITING_TRACKING: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_track_code)]
+        },
+        fallbacks=[CommandHandler("cancel", cancel_conv)]
+    )
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(target_conv)
+    app.add_handler(promo_conv)
+    app.add_handler(track_conv)
+    app.add_handler(CallbackQueryHandler(handle_callback))
+
+    logging.info("Bot başlatılıyor...")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
