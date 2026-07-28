@@ -5,12 +5,14 @@ import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
+# Logging yapılandırması
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 
-BOT_TOKEN = "8674816242:AAEPviDpFQxP2dCWGzB0BGg6ZAcNqQI8YT0"
+# Konfigürasyon (Token ve Admin Bilgileri)
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8674816242:AAEPviDpFQxP2dCWGzB0BGg6ZAcNqQI8YT0")
 ADMIN_USERNAME = "@kralinarest"
 ADMIN_ID = 8674816242
 BOT_USERNAME = "ChiwasIslemBot"
@@ -18,12 +20,14 @@ BOT_USERNAME = "ChiwasIslemBot"
 DATA_FILE = "users_data.json"
 REFERRAL_REWARD = 40
 
+# --- VERİTABANI İŞLEMLERİ ---
 def load_data():
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
+        except Exception as e:
+            logging.error(f"Data okuma hatasi: {e}")
             return {}
     return {}
 
@@ -55,6 +59,7 @@ def update_user_data(user_id, key, value):
     data[uid][key] = value
     save_data(data)
 
+# --- HİZMET TANIMLARI ---
 SERVICES = [
     "1. Tel No ile Tel Cokertme",
     "2. Kameraya Sizna",
@@ -64,8 +69,8 @@ SERVICES = [
     "6. Instagram Hesap Acma",
     "7. Deepfake Hizmeti",
     "8. Galeriye Sizna",
-    "9. Telefona Tam Sizma",
-    "10. WhatsApp Sizma",
+    "9. Telefona Tam Sizna",
+    "10. WhatsApp Sizna",
     "11. Fake Numara Saglama",
     "12. Instagram Hesap Kapatma",
     "13. TikTok Hesap Kapatma",
@@ -139,6 +144,7 @@ def get_welcome_text(first_name):
         f"👇 İşlem yapmak için aşağıdaki menüyü kullanabilirsiniz:"
     )
 
+# --- USER KOMUTLARI ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     u_data = get_user_data(user.id)
@@ -160,11 +166,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     try:
                         await context.bot.send_message(
                             chat_id=int(inviter_id),
-                            text=f"🎉 TEBRİKLER!\nBir arkadaşınız davetinizle bota katıldı.\n🎁 REFERANS KAZANCI! Davet Eden: {inviter_id}"
+                            text=f"🎉 TEBRİKLER!\nBir arkadaşınız davetinizle bota katıldı.\n🎁 Hesabınıza +40 TL referans bakiyesi eklendi!"
                         )
                     except Exception:
                         pass
-                    await notify_admin(context, f"🎁 REFERANS KAZANCI!\nDavet Eden: {inviter_id}\nKatılan: {user.first_name} (@{user.username})")
+                    await notify_admin(context, f"🎁 REFERANS KAZANCI!\nDavet Eden ID: {inviter_id}\nKatılan: {user.first_name} (@{user.username})")
         except Exception as e:
             logging.error(f"Referans hatasi: {e}")
 
@@ -191,6 +197,150 @@ def build_service_keyboard(cart, express):
     keyboard.append([InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")])
     return InlineKeyboardMarkup(keyboard)
 
+# --- ADMINISTRATIVE KOMUTLAR ---
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id != ADMIN_ID:
+        return
+
+    admin_text = (
+        "👑 **CHIWAS YÖNETİCİ PANELİ**\n"
+        "-----------------------------------------\n"
+        "Sistem üzerinde kullanabileceğiniz yönetici komutları:\n\n"
+        "📊 `/istatistik` - Genel sistem istatistiklerini gösterir.\n"
+        "📢 `/duyuru <mesaj>` - Tüm kullanıcılara toplu duyuru gönderir.\n"
+        "💳 `/bakiye_ekle <user_id> <miktar>` - Kullanıcıya bakiye ekler.\n"
+        "🔻 `/bakiye_sil <user_id> <miktar>` - Kullanıcıdan bakiye düşer.\n"
+        "🔍 `/kullanici <user_id>` - Kullanıcı detaylarını gösterir.\n"
+    )
+    await update.message.reply_text(admin_text, parse_mode="Markdown")
+
+async def admin_istatistik(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    all_data = load_data()
+    total_users = len(all_data)
+    total_balance = sum(u.get("balance", 0) for u in all_data.values())
+    total_invited = sum(u.get("invited_count", 0) for u in all_data.values())
+    total_orders = sum(len(u.get("history", [])) for u in all_data.values())
+
+    msg = (
+        f"📊 **CHIWAS BOT İSTATİSTİKLERİ**\n"
+        f"-----------------------------------------\n"
+        f"👤 Toplam Kayıtlı Kullanıcı: `{total_users}`\n"
+        f"💰 Sistemdeki Toplam Bakiye: `{total_balance} TL`\n"
+        f"👥 Toplam Davet Edilen Kullanıcı: `{total_invited}`\n"
+        f"🛒 Toplam Tamamlanan Sipariş: `{total_orders}`"
+    )
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+async def admin_duyuru(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    if not context.args:
+        await update.message.reply_text("⚠️ Kullanım: `/duyuru <Gönderilecek Mesaj>`", parse_mode="Markdown")
+        return
+
+    broadcast_msg = " ".join(context.args)
+    all_data = load_data()
+    success_count = 0
+    fail_count = 0
+
+    await update.message.reply_text("🚀 Duyuru gönderimi başlatıldı...")
+
+    for uid in all_data.keys():
+        try:
+            await context.bot.send_message(
+                chat_id=int(uid),
+                text=f"📢 **CHIWAS VIP RESMİ DUYURU**\n-----------------------------------------\n\n{broadcast_msg}",
+                parse_mode="Markdown"
+            )
+            success_count += 1
+            time.sleep(0.05)  # Telegram API limitlerine takılmamak için
+        except Exception:
+            fail_count += 1
+
+    await update.message.reply_text(
+        f"✅ **Duyuru Gönderimi Tamamlandı!**\n\n"
+        f"Başarılı: `{success_count}`\n"
+        f"Başarısız/Engellemiş: `{fail_count}`",
+        parse_mode="Markdown"
+    )
+
+async def admin_bakiye_ekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    if len(context.args) < 2:
+        await update.message.reply_text("⚠️ Kullanım: `/bakiye_ekle <user_id> <miktar>`", parse_mode="Markdown")
+        return
+
+    target_id, amount_str = context.args[0], context.args[1]
+    try:
+        amount = int(amount_str)
+        all_data = load_data()
+        if target_id in all_data:
+            all_data[target_id]["balance"] = all_data[target_id].get("balance", 0) + amount
+            save_data(all_data)
+            await update.message.reply_text(f"✅ `{target_id}` kullanıcısına **+{amount} TL** bakiye eklendi.")
+            try:
+                await context.bot.send_message(chat_id=int(target_id), text=f"🎁 Hesabınıza **+{amount} TL** bakiye tanımlandı!")
+            except Exception:
+                pass
+        else:
+            await update.message.reply_text("❌ Kullanıcı bulunamadı.")
+    except ValueError:
+        await update.message.reply_text("⚠️ Miktar geçerli bir sayı olmalıdır.")
+
+async def admin_bakiye_sil(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    if len(context.args) < 2:
+        await update.message.reply_text("⚠️ Kullanım: `/bakiye_sil <user_id> <miktar>`", parse_mode="Markdown")
+        return
+
+    target_id, amount_str = context.args[0], context.args[1]
+    try:
+        amount = int(amount_str)
+        all_data = load_data()
+        if target_id in all_data:
+            current_bal = all_data[target_id].get("balance", 0)
+            all_data[target_id]["balance"] = max(0, current_bal - amount)
+            save_data(all_data)
+            await update.message.reply_text(f"✅ `{target_id}` kullanıcısından **-{amount} TL** bakiye düşüldü.")
+        else:
+            await update.message.reply_text("❌ Kullanıcı bulunamadı.")
+    except ValueError:
+        await update.message.reply_text("⚠️ Miktar geçerli bir sayı olmalıdır.")
+
+async def admin_kullanici(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    if not context.args:
+        await update.message.reply_text("⚠️ Kullanım: `/kullanici <user_id>`", parse_mode="Markdown")
+        return
+
+    target_id = context.args[0]
+    all_data = load_data()
+    if target_id in all_data:
+        u = all_data[target_id]
+        history_text = "\n".join([f"• {item}" for item in u.get("history", [])]) if u.get("history") else "Sipariş yok."
+        text = (
+            f"👤 **KULLANICI BİLGİSİ (`{target_id}`)**\n"
+            f"-----------------------------------------\n"
+            f"💰 Bakiye: `{u.get('balance', 0)} TL`\n"
+            f"👥 Davet Sayısı: `{u.get('invited_count', 0)}` \n\n"
+            f"📜 Sipariş Geçmişi:\n{history_text}"
+        )
+        await update.message.reply_text(text, parse_mode="Markdown")
+    else:
+        await update.message.reply_text("❌ Kullanıcı veritabanında bulunamadı.")
+
+# --- CALLBACK BUTON İŞLEMLERİ ---
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user = query.from_user
@@ -207,7 +357,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data == "select_services":
-        text = "🥳 VIP TARİFE VE İNDİRİM TABLOSU\n-----------------------------------------\n1 İşlem: 1000 TL..."
+        text = "🥳 VIP TARİFE VE İNDİRİM TABLOSU\n-----------------------------------------\nİstediğiniz hizmetlerin üzerine tıklayarak sepete ekleyebilirsiniz."
         await query.edit_message_text(text=text, reply_markup=build_service_keyboard(cart, express))
 
     elif data == "toggle_express":
@@ -286,15 +436,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
-    elif data == "track":
-        history = u_data.get('history', [])
-        if history:
-            status_text = "🔎 CANLI SİPARİŞ TAKİP PANELİ\n-----------------------------------------\n" + "\n".join([f"• {item}" for item in history])
-        else:
-            status_text = "🔎 CANLI SİPARİŞ TAKİP PANELİ\n-----------------------------------------\n⚠️ Henüz aktif bir siparişiniz bulunmamaktadır."
-        keyboard = [[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]]
-        await query.edit_message_text(text=status_text, reply_markup=InlineKeyboardMarkup(keyboard))
-
     elif data == "catalog":
         text = "📜 HİZMET KATALOĞU VE DETAYLARI\n-----------------------------------------\n\n"
         for idx, name in enumerate(SERVICES):
@@ -312,62 +453,4 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"👤 Toplam Davet Ettiğiniz Kullanıcı: {invited_count}\n"
             f"💰 Kazanılan İndirim Bakiyesi: {balance} TL\n\n"
             f"🔗 Özel Davet Bağlantınız:\n`{ref_link}`\n\n"
-            f"💡 Bu linki arkadaşlarınıza göndererek her katılan kişi için +40 TL indirim kazanın!"
-        )
-        share_url = f"https://t.me/share/url?url={ref_link}&text=VIP%20İşlem%20Botu!"
-        keyboard = [
-            [InlineKeyboardButton("🚀 Davet Linkini Arkadaşına Gönder", url=share_url)],
-            [InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]
-        ]
-        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
-
-    elif data == "vip_contact":
-        text = f"👑 VIP ÖZEL MÜŞTERİ TALEBİ\n-----------------------------------------\nÖzel projeleriniz ve yüksek bütçeli işlemleriniz için VIP Temsilcimiz ile iletişime geçebilirsiniz."
-        keyboard = [[InlineKeyboardButton("💬 VIP Temsilciye Yaz", url=f"https://t.me/{ADMIN_USERNAME.replace('@', '')}")], [InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]]
-        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif data == "guarantee":
-        text = "🛡 GÜVENLİK VE GARANTİ PROTOKOLÜ\n-----------------------------------------\n1. %100 Gizlilik Garantisi\n2. İade Hakkı\n3. Anlık İşlem Desteği"
-        keyboard = [[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]]
-        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif data == "reviews":
-        text = "⭐ MÜŞTERİ GERİ BİLDİRİMLERİ\n-----------------------------------------\n👨‍💻 M.K.: ⭐⭐⭐⭐⭐ Mükemmel hızlı işlem!"
-        keyboard = [[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]]
-        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif data == "profile":
-        history_list = u_data.get('history', [])
-        history_text = "\n".join([f"• {item}" for item in history_list]) if history_list else "Henüz sipariş yok."
-        text = f"👤 MÜŞTERİ PROFİL BİLGİLERİ\n-----------------------------------------\n🆔 Müşteri ID: {user.id}\n💰 Bakiye: {u_data.get('balance', 0)} TL\n📜 Sipariş Geçmişi:\n{history_text}"
-        keyboard = [[InlineKeyboardButton("💳 Bakiye Yükle / Öde", callback_data="purchase")], [InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]]
-        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif data == "faq":
-        text = "❓ SIKÇA SORULAN SORULAR\n-----------------------------------------\n📌 İşlem süresi ne kadar?\nİşlemleriniz sıraya alınır ve en kısa sürede tamamlanır."
-        keyboard = [[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]]
-        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif data == "sent":
-        text = f"📩 ÖDEME BİLDİRİMİNİZ ALINDI\n-----------------------------------------\nLütfen dekontunuzu doğrudan VIP Temsilcimize iletiniz."
-        await notify_admin(context, f"💰 ÖDEME BİLDİRİMİ!\nMüşteri: {user.first_name} (@{user.username})\nID: {user.id}")
-        keyboard = [[InlineKeyboardButton("💬 Dekontu Temsilciye Gönder", url=f"https://t.me/{ADMIN_USERNAME.replace('@', '')}")], [InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]]
-        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif data == "back_main":
-        await query.edit_message_text(text=get_welcome_text(user.first_name), reply_markup=get_main_keyboard())
-
-def run_bot():
-    app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(handle_buttons))
-    print("Bot sorunsuz baslatildi...")
-    app.run_polling()
-
-if __name__ == "__main__":
-    while True:
-        try:
-            run_bot()
-        except Exception as e:
-            logging.error(f"Bot baglantisi koptu/hata aldi: {e}. 10 saniye sonra tekrar deneniyor...")
-            time.sleep(10)
+            f"💡 Bu linki arkadaşlarınıza göndererek her katılan kişi için +40 TL indirim kazan
