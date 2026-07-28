@@ -689,10 +689,126 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             banned[str(target_uid)] = True
             save_json(BANNED_FILE, banned)
             await query.edit_message_caption(caption=f"{query.message.caption}\n\n🚫 <b>KULLANICI ENGELLENDİ</b>")# --- YÖNETİCİ KOMUTLARI ---
+# --- GİZLİ ADMİN PANELİ VE KOMUTLARI ---
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id != ADMIN_ID:
+        return
+
+    all_users = load_json(DATA_FILE)
+    all_orders = load_json(ORDERS_FILE)
+    banned_users = load_json(BANNED_FILE)
+
+    panel_text = (
+        f"👑 <b>CHIWAS VIP - YÖNETİCİ PANELİ</b>\n--------------------------------------------\n"
+        f"👥 <b>Toplam Kayıtlı Müşteri:</b> {len(all_users)}\n"
+        f"📦 <b>Toplam Sipariş Sayısı:</b> {len(all_orders)}\n"
+        f"🚫 <b>Engellenen Müşteriler:</b> {len(banned_users)}\n\n"
+        f"📌 <b>KULLANILABİLİR ADMİN KOMUTLARI:</b>\n\n"
+        f"💵 <b>Bakiye Yükle:</b>\n<code>/bakiye_ekle ID TUTAR</code>\n<i>Örn: /bakiye_ekle 123456789 500</i>\n\n"
+        f"📊 <b>Sipariş İlerleme Güncelle:</b>\n<code>/durum SIPARIS_KODU YUZDE</code>\n<i>Örn: /durum CHW-54321 80</i>\n\n"
+        f"📢 <b>Toplu Duyuru Gönder:</b>\n<code>/duyuru Mesajınız</code>\n\n"
+        f"🚫 <b>Kullanıcı Banla/Kaldır:</b>\n<code>/ban ID</code> veya <code>/unban ID</code>\n\n"
+        f"🎟 <b>Promo Kod Oluştur:</b>\n<code>/addcoupon KOD MIKTAR LIMIT</code>"
+    )
+    await update.message.reply_text(panel_text, parse_mode="HTML")
+
+async def admin_add_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        target_uid = context.args[0]
+        amount = int(context.args[1])
+        
+        data = load_json(DATA_FILE)
+        if target_uid in data:
+            data[target_uid]["balance"] = data[target_uid].get("balance", 0) + amount
+            save_json(DATA_FILE, data)
+            await update.message.reply_text(f"✅ <code>{target_uid}</code> ID'li kullanıcıya <b>+{amount} TL</b> bakiye eklendi!", parse_mode="HTML")
+            
+            try:
+                await context.bot.send_message(chat_id=int(target_uid), text=f"🎉 <b>HESABINIZA BAKİYE YÜKLENDİ!</b>\n\nYönetici tarafından hesabınıza <b>+{amount} TL</b> eklendi.", parse_mode="HTML")
+            except Exception:
+                pass
+        else:
+            await update.message.reply_text("❌ Kullanıcı bulunamadı!")
+    except Exception:
+        await update.message.reply_text("⚠️ Doğru Kullanım: `/bakiye_ekle ID TUTAR`", parse_mode="HTML")
+
+async def admin_update_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        track_code = context.args[0].upper()
+        percent = context.args[1]
+
+        orders = load_json(ORDERS_FILE)
+        if track_code in orders:
+            orders[track_code]["percent"] = percent
+            orders[track_code]["status_text"] = f"İşlem Devam Ediyor (%{percent})"
+            save_json(ORDERS_FILE, orders)
+
+            user_id = orders[track_code]["user_id"]
+            await update.message.reply_text(f"✅ <code>#{track_code}</code> siparişi %{percent} olarak güncellendi.", parse_mode="HTML")
+
+            try:
+                await context.bot.send_message(chat_id=user_id, text=f"🔄 <b>SİPARİŞ DURUMU GÜNCELLENDİ!</b>\n\n#{track_code} kodlu siparişinizin ilerleme durumu: <b>%{percent}</b>", parse_mode="HTML")
+            except Exception:
+                pass
+        else:
+            await update.message.reply_text("❌ Sipariş kodu bulunamadı!")
+    except Exception:
+        await update.message.reply_text("⚠️ Doğru Kullanım: `/durum CHW-12345 50`", parse_mode="HTML")
+
+async def admin_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    msg = " ".join(context.args)
+    if not msg:
+        await update.message.reply_text("⚠️ Kullanım: `/duyuru Gönderilecek Mesaj`", parse_mode="HTML")
+        return
+
+    users = load_json(DATA_FILE)
+    success = 0
+    await update.message.reply_text("📢 Duyuru gönderimi başlatıldı...")
+
+    for uid in users:
+        try:
+            await context.bot.send_message(chat_id=int(uid), text=f"📢 <b>SİSTEM DUYURUSU</b>\n--------------------------------------------\n{msg}", parse_mode="HTML")
+            success += 1
+        except Exception:
+            pass
+
+    await update.message.reply_text(f"✅ Duyuru <b>{success}</b> kullanıcıya başarıyla ulaştırıldı!", parse_mode="HTML")
+
+async def admin_ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        uid = str(context.args[0])
+        banned = load_json(BANNED_FILE)
+        banned[uid] = True
+        save_json(BANNED_FILE, banned)
+        await update.message.reply_text(f"🚫 <code>{uid}</code> ID'li kullanıcı bota erişimden engellendi.", parse_mode="HTML")
+    except Exception:
+        await update.message.reply_text("⚠️ Kullanım: `/ban ID`", parse_mode="HTML")
+
+async def admin_unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        uid = str(context.args[0])
+        banned = load_json(BANNED_FILE)
+        if uid in banned:
+            del banned[uid]
+            save_json(BANNED_FILE, banned)
+            await update.message.reply_text(f"✅ <code>{uid}</code> ID'li kullanıcının engeli kaldırıldı.", parse_mode="HTML")
+    except Exception:
+        await update.message.reply_text("⚠️ Kullanım: `/unban ID`", parse_mode="HTML")
+
 async def admin_add_coupon(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
-
     try:
         code = context.args[0].upper()
         amount = int(context.args[1])
@@ -736,13 +852,24 @@ def main():
         fallbacks=[CommandHandler("cancel", cancel_conv)]
     )
 
+    # Standart Komutlar
     app.add_handler(CommandHandler("start", start))
+    
+    # Admin Komutları
+    app.add_handler(CommandHandler("admin", admin_panel))
+    app.add_handler(CommandHandler("bakiye_ekle", admin_add_balance))
+    app.add_handler(CommandHandler("durum", admin_update_status))
+    app.add_handler(CommandHandler("duyuru", admin_broadcast))
+    app.add_handler(CommandHandler("ban", admin_ban_user))
+    app.add_handler(CommandHandler("unban", admin_unban_user))
     app.add_handler(CommandHandler("addcoupon", admin_add_coupon))
 
+    # Conversation Handlers
     app.add_handler(target_conv)
     app.add_handler(promo_conv)
     app.add_handler(track_conv)
 
+    # Callback Query Handler
     app.add_handler(CallbackQueryHandler(handle_callback))
 
     logging.info("Bot başarıyla başlatıldı ve dinlemeye geçti.")
