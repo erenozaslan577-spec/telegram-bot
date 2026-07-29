@@ -24,11 +24,11 @@ logging.basicConfig(
 )
 
 # --- KONFİGÜRASYON ---
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8674816242:AAFyfHCoSRwJv_bJ8ffzsTDL83h3BaEfyVo")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8674816242:AAEfxh0DvzgTKjfRwzdFJ1jWimaYpI_bVezW")
 ADMIN_USERNAME = "@kralinarest"
 ADMIN_ID = int(os.getenv("ADMIN_ID", "8932488958"))
 BOT_USERNAME = "ChiwasIslenBot"
-REQUIRED_CHANNEL = "@ChiwasDuyuru"  # Zorunlu duyuru kanalı
+REQUIRED_CHANNEL = "@ChiwasDuyuru"
 
 DATA_FILE = "users_data.json"
 COUPONS_FILE = "coupons_data.json"
@@ -37,12 +37,12 @@ BANNED_FILE = "banned_users.json"
 REFERRAL_REWARD = 40
 
 db_lock = threading.Lock()
-rate_limit_store = {}  # Anti-spam deposu
+rate_limit_store = {}
 
 # Conversation States
 WAITING_TARGET_INFO, WAITING_DEKONT, WAITING_PROMO, WAITING_TRACKING = range(4)
 
-# --- VERİTABANI İŞLEMLERİ (GÜVENLİ THREAD-LOCK) ---
+# --- VERİTABANI İŞLEMLERİ ---
 def load_json(filepath):
     with db_lock:
         if os.path.exists(filepath):
@@ -60,9 +60,7 @@ def save_json(filepath, data):
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
         except Exception as e:
-            logging.error(f"{filepath} kayit hatasi: {e}")
-
-def get_user_data(user_id):
+            logging.error(f"{filepath} kayit hatasi: {e}")def get_user_data(user_id):
     data = load_json(DATA_FILE)
     uid = str(user_id)
     if uid not in data:
@@ -84,15 +82,13 @@ def update_user_data(user_id, key, value):
     data[uid][key] = value
     save_json(DATA_FILE, data)
 
-# --- GÜVENLİK FİLTRELERİ (ANTI-SPAM & SANITIZE) ---
+# --- GÜVENLİK FİLTRELERİ ---
 def sanitize_input(text: str) -> str:
-    """Kullanıcı verisini XSS ve HTML Injection'a karşı temizler."""
     if not text:
         return ""
     return html.escape(text.strip())
 
 def is_rate_limited(user_id: int, limit_seconds: float = 1.0) -> bool:
-    """Buton spamını engeller."""
     now = time.time()
     last_time = rate_limit_store.get(user_id, 0)
     if now - last_time < limit_seconds:
@@ -101,7 +97,6 @@ def is_rate_limited(user_id: int, limit_seconds: float = 1.0) -> bool:
     return False
 
 def is_banned(user_id: int) -> bool:
-    """Kullanıcının engellenip engellenmediğini kontrol eder."""
     banned = load_json(BANNED_FILE)
     return str(user_id) in banned
 
@@ -142,9 +137,7 @@ SERVICE_DETAILS = {
     13: "Telegram kullanıcı adından bağlı numarayı bulur.",
     14: "Cihaz mikrofonunu canlı ve gizli olarak aktifleştirir.",
     15: "Yüz tarama ve yapay zeka algoritması ile fotoğraf üzerinden tüm aktif sosyal medya hesaplarını bulur."
-}
-
-def calculate_price(count, express=False):
+}def calculate_price(count, express=False):
     if count == 0:
         base = 0
     elif count == 1:
@@ -189,10 +182,8 @@ def get_welcome_text(first_name):
         f"📌 İşlem yapmak için aşağıdaki menüyü kullanabilirsiniz:"
     )
 
-# --- KULLANICI BAŞLANGIÇ ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    
     if is_banned(user.id):
         await update.message.reply_text("❌ <b>Erişiminiz Engellendi!</b>\nGüvenlik ihlali nedeniyle bota erişiminiz kısıtlanmıştır.", parse_mode="HTML")
         return
@@ -208,8 +199,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("✅ Katıldım, Başlat", callback_data="check_join")]
         ])
         await update.message.reply_text(
-            f"⚠️ <b>GÜVENLİK PROTOKOLÜ: KANAL KATILIMI ZORUNLUDUR</b>\n\n"
-            f"Sisteme erişmek için resmi kanalımıza katılmış olmanız gerekmektedir.",
+            f"⚠️ <b>GÜVENLİK PROTOKOLÜ: KANAL KATILIMI ZORUNLUDUR</b>\n\nSisteme erişmek için resmi kanalımıza katılmış olmanız gerekmektedir.",
             reply_markup=btn,
             parse_mode="HTML"
         )
@@ -228,11 +218,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     save_json(DATA_FILE, all_data)
                     update_user_data(user.id, f"ref_{user.id}", True)
                     try:
-                        await context.bot.send_message(
-                            chat_id=int(inviter_id),
-                            text=f"🎉 <b>TEBRİKLER!</b>\nBir arkadaşınız davetinizle bota katıldı. Hesabınıza +{REFERRAL_REWARD} TL eklendi!",
-                            parse_mode="HTML"
-                        )
+                        await context.bot.send_message(chat_id=int(inviter_id), text=f"🎉 <b>TEBRİKLER!</b>\nBir arkadaşınız davetinizle bota katıldı. Hesabınıza +{REFERRAL_REWARD} TL eklendi!", parse_mode="HTML")
                     except Exception:
                         pass
         except Exception as e:
@@ -259,15 +245,12 @@ def build_service_keyboard(cart, express):
     price_tl = calculate_price(count, express)
     keyboard.append([InlineKeyboardButton(f"🛒 Sepeti Onayla ({count} İşlem - {price_tl} TL)", callback_data="checkout")])
     keyboard.append([InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")])
-    return InlineKeyboardMarkup(keyboard)   # --- CONVERSATION HANDLERS ---
+    return InlineKeyboardMarkup(keyboard)# --- CONVERSATION HANDLERS ---
 async def start_target_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
     await query.edit_message_text(
-        f"🎯 <b>HEDEF BİLGİSİ GİRİŞİ</b>\n----------------------------------------\n"
-        f"Lütfen işlem yapılmasını istediğiniz <b>Target Telefon Numarasını / Kullanıcı Adını</b> yazıp gönderin:\n\n"
-        f"🔒 <i>Girdiğiniz tüm bilgiler şifrelenmektedir.</i>",
+        f"🎯 <b>HEDEF BİLGİSİ GİRİŞİ</b>\n----------------------------------------\nLütfen işlem yapılmasını istediğiniz <b>Target Telefon Numarasını / Kullanıcı Adını</b> yazıp gönderin:\n\n🔒 <i>Girdiğiniz tüm bilgiler şifrelenmektedir.</i>",
         parse_mode="HTML"
     )
     return WAITING_TARGET_INFO
@@ -275,7 +258,6 @@ async def start_target_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def receive_target_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_info = sanitize_input(update.message.text)
     context.user_data['target_info'] = target_info
-
     order = context.user_data.get('pending_order', {})
     final_price = order.get('final_price', 0)
 
@@ -296,10 +278,7 @@ async def receive_dekont(update: Update, context: ContextTypes.DEFAULT_TYPE):
     order = context.user_data.get('pending_order', {})
 
     if not update.message.photo:
-        await update.message.reply_text(
-            "⚠️ <b>GÜVENLİK UYARISI:</b> Sadece ödeme dekontunun <b>FOTOĞRAFINI</b> kabul ediyoruz. Metin kabul edilmez.",
-            parse_mode="HTML"
-        )
+        await update.message.reply_text("⚠️ <b>GÜVENLİK UYARISI:</b> Sadece ödeme dekontunun <b>FOTOĞRAFINI</b> kabul ediyoruz.", parse_mode="HTML")
         return WAITING_DEKONT
 
     count = order.get('count', 0)
@@ -334,20 +313,16 @@ async def receive_dekont(update: Update, context: ContextTypes.DEFAULT_TYPE):
         update_user_data(user.id, "balance", u_data["balance"])
 
     admin_markup = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("✅ Onayla", callback_data=f"adm_approve_{user.id}_{track_code}"),
-            InlineKeyboardButton("❌ Reddet", callback_data=f"adm_reject_{user.id}_{track_code}")
-        ],
+        [InlineKeyboardButton("✅ Onayla", callback_data=f"adm_approve_{user.id}_{track_code}"), InlineKeyboardButton("❌ Reddet", callback_data=f"adm_reject_{user.id}_{track_code}")],
         [InlineKeyboardButton("🚫 Kullanıcıyı Banla", callback_data=f"adm_quickban_{user.id}")]
     ])
 
     admin_msg = (
-        f"🚨 <b>YENİ DEKONT & SİPARİŞ BİLDİRİMİ!</b>\n----------------------------------------\n"
+        f"🚨 <b>YENİ DEKONT BİLDİRİMİ!</b>\n----------------------------------------\n"
         f"👤 <b>Müşteri:</b> {sanitize_input(user.first_name)} (@{user.username})\n"
         f"🆔 <b>ID:</b> <code>{user.id}</code>\n"
         f"🏷 <b>Takip Kodu:</b> <code>{track_code}</code>\n"
         f"🎯 <b>Hedef Bilgi:</b> <code>{target_info}</code>\n"
-        f"🛒 <b>Sepet:</b> {', '.join(services) if services else 'Özel İşlem'}\n"
         f"💰 <b>Beklenen Tutar:</b> <b>{final_price} TL</b>"
     )
 
@@ -355,24 +330,16 @@ async def receive_dekont(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_photo(chat_id=ADMIN_ID, photo=photo_file_id, caption=admin_msg, reply_markup=admin_markup, parse_mode="HTML")
 
     await update.message.reply_text(
-        f"✅ <b>SİPARİŞİNİZ ALINDI!</b>\n----------------------------------------\n"
-        f"📋 Sipariş Takip Kodunuz: <code>{track_code}</code>\n\n"
-        f"Dekontunuz finans ekibimize iletildi. Kontrol edildikten sonra işleminiz başlatılacaktır.\n"
-        f"Durumunuzu 📍 <b>Sipariş Sorgula</b> butonundan anlık takip edebilirsiniz.",
+        f"✅ <b>SİPARİŞİNİZ ALINDI!</b>\n----------------------------------------\n📋 Sipariş Takip Kodunuz: <code>{track_code}</code>\n\nDekontunuz kontrol edildikten sonra işleminiz başlatılacaktır.",
         reply_markup=get_main_keyboard(),
         parse_mode="HTML"
     )
-
     return ConversationHandler.END
 
 async def start_use_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
-    await query.edit_message_text(
-        "🎟 <b>PROMO KOD GİRİŞİ</b>\n----------------------------------------\nLütfen kupon kodunuzu yazıp gönderin:",
-        parse_mode="HTML"
-    )
+    await query.edit_message_text("🎟 <b>PROMO KOD GİRİŞİ</b>\n----------------------------------------\nLütfen kupon kodunuzu yazıp gönderin:", parse_mode="HTML")
     return WAITING_PROMO
 
 async def receive_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -391,34 +358,22 @@ async def receive_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             u_data = get_user_data(user.id)
             u_data["balance"] = u_data.get("balance", 0) + amount
             c.setdefault("used_by", []).append(str(user.id))
-
             save_json(COUPONS_FILE, coupons)
             update_user_data(user.id, "balance", u_data["balance"])
-
-            await update.message.reply_text(
-                f"🎉 <b>TEBRİKLER!</b>\n<code>{code}</code> kuponu kabul edildi. Hesabınıza <b>+{amount} TL</b> eklendi!",
-                reply_markup=get_main_keyboard(),
-                parse_mode="HTML"
-            )
+            await update.message.reply_text(f"🎉 <b>TEBRİKLER!</b>\nHesabınıza <b>+{amount} TL</b> eklendi!", reply_markup=get_main_keyboard(), parse_mode="HTML")
     else:
         await update.message.reply_text("❌ Geçersiz veya süresi dolmuş promo kod!", reply_markup=get_main_keyboard())
-
     return ConversationHandler.END
 
 async def start_track_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
-    await query.edit_message_text(
-        "🔍 <b>SİPARİŞ DURUMU SORGULAMA</b>\n----------------------------------------\nLütfen 5 haneli <b>Takip Kodunuzu</b> yazıp gönderin (Örn: CHW-12345):",
-        parse_mode="HTML"
-    )
+    await query.edit_message_text("🔍 <b>SİPARİŞ SORGULAMA</b>\n----------------------------------------\nLütfen <b>Takip Kodunuzu</b> yazıp gönderin (Örn: CHW-12345):", parse_mode="HTML")
     return WAITING_TRACKING
 
 async def receive_track_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     code = sanitize_input(update.message.text.strip().upper())
     orders = load_json(ORDERS_FILE)
-
     if code in orders:
         ord_info = orders[code]
         status_msg = (
@@ -426,20 +381,16 @@ async def receive_track_code(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"📅 <b>Tarih:</b> {ord_info.get('date', 'N/A')}\n"
             f"🎯 <b>Hedef:</b> <code>{ord_info.get('target_info', 'Gizli')}</code>\n"
             f"📊 <b>İlerleme:</b> %{ord_info.get('percent', '0')}\n"
-            f"📌 <b>Durum:</b> {ord_info.get('status_text', 'İşleniyor')}\n"
-            f"🛠 <b>Hizmetler:</b>\n• " + "\n• ".join(ord_info.get("services", []))
+            f"📌 <b>Durum:</b> {ord_info.get('status_text', 'İşleniyor')}"
         )
         await update.message.reply_text(status_msg, reply_markup=get_main_keyboard(), parse_mode="HTML")
     else:
         await update.message.reply_text("❌ Girilen takip koduna ait sipariş bulunamadı!", reply_markup=get_main_keyboard())
-
     return ConversationHandler.END
 
 async def cancel_conv(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ İşlem iptal edildi.", reply_markup=get_main_keyboard())
-    return ConversationHandler.END
-
-# --- BUTON TIKLAMA (CALLBACK QUERY) HANDLER ---
+    return ConversationHandler.END# --- BUTON TIKLAMA HANDLER ---
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user = update.effective_user
@@ -514,7 +465,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
 
         summary_text = (
-            f"🛒 <b>SEPET ÖZETİ & SEÇİLEN İŞLEMLER</b>\n----------------------------------------\n"
+            f"🛒 <b>SEPET ÖZETİ</b>\n----------------------------------------\n"
             f"• " + "\n• ".join(selected_services) + "\n\n"
             f"⚡ <b>Express Teslimat:</b> {'EVET (+300 TL)' if express else 'HAYIR'}\n"
             f"💰 <b>Tutar:</b> {raw_price} TL\n"
@@ -531,20 +482,19 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "purchase":
         text = (
-            f"💳 <b>BAKİYE YÜKLENE & DİREKT ÖDEME</b>\n----------------------------------------\n"
-            f"İstediğiniz tutarda ödeme yapmak için aşağıdaki IBAN bilgilerini kullanabilirsiniz:\n\n"
+            f"💳 <b>BAKİYE YÜKLE & DİREKT ÖDEME</b>\n----------------------------------------\n"
             f"📍 <b>IBAN:</b> <code>TR10 0006 2000 9100 0006 9897 09</code>\n"
             f"👤 <b>Alıcı:</b> <code>Garanti Ödeme ve Elektronik Para Hizmetleri A.Ş.</code>\n"
             f"💬 <b>Açıklama:</b> <code>TAW17786986257878012</code>\n\n"
-            f"✏️ Metinlere dokunarak kolayca kopyalayabilirsiniz. Ödeme yaptıktan sonra dekontunuzu Destek ekibimize iletebilirsiniz."
+            f"Ödeme yaptıktan sonra dekontunuzu Destek ekibimize iletebilirsiniz."
         )
         btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]])
         await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
 
     elif data == "guide":
-        text = f"📜 <b>HİZMET KATALOĞU VE AÇIKLAMALARI</b>\n----------------------------------------\n\n"
+        text = f"📜 <b>HİZMET KATALOĞU</b>\n----------------------------------------\n\n"
         for i, name in enumerate(SERVICES):
-            text += f"<b>{name}</b>\n<i>└ {SERVICE_DETAILS.get(i, 'Açıklama mevcut değil.')}</i>\n\n"
+            text += f"<b>{name}</b>\n<i>└ {SERVICE_DETAILS.get(i, 'Açıklama yok.')}</i>\n\n"
         btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]])
         await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
 
@@ -559,7 +509,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 remaining = timedelta(hours=24) - (now - last_date)
                 hours, remainder = divmod(remaining.seconds, 3600)
                 minutes, _ = divmod(remainder, 60)
-                await query.answer(f"⏳ Çarkı tekrar çevirmek için {hours} saat {minutes} dakika beklemelisiniz!", show_alert=True)
+                await query.answer(f"⏳ Çarkı tekrar çevirmek için {hours}s {minutes}dk beklemelisiniz!", show_alert=True)
                 return
 
         reward = random.choice([50, 100, 150, 200, 250])
@@ -569,12 +519,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         update_user_data(user.id, "balance", u_data["balance"])
         update_user_data(user.id, "last_wheel", u_data["last_wheel"])
 
-        text = (
-            f"🎰 <b>GÜNLÜK ŞANS ÇARKI ÇEVRİLDİ!</b>\n----------------------------------------\n"
-            f"🎉 Tebrikler! Çarktan <b>+{reward} TL</b> bakiye kazandınız!\n"
-            f"💰 Yeni Bakiyeniz: <b>{u_data['balance']} TL</b>\n\n"
-            f"⏰ 24 Saat sonra tekrar şansınızı deneyebilirsiniz."
-        )
+        text = f"🎰 <b>GÜNLÜK ŞANS ÇARKI!</b>\n----------------------------------------\n🎉 Çarktan <b>+{reward} TL</b> bakiye kazandınız!\n💰 Yeni Bakiyeniz: <b>{u_data['balance']} TL</b>"
         btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]])
         await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
 
@@ -582,70 +527,41 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         u_data = get_user_data(user.id)
         ref_link = f"https://t.me/{BOT_USERNAME}?start=CHW-{user.id}"
         text = (
-            f"👥 <b>REFERANS VE KAZANÇ SİSTEMİ</b>\n----------------------------------------\n"
-            f"Davet ettiğiniz her kullanıcı için anında <b>+{REFERRAL_REWARD} TL</b> kazanın!\n\n"
-            f"📊 <b>İstatistikleriniz:</b>\n"
+            f"👥 <b>REFERANS SİSTEMİ</b>\n----------------------------------------\n"
+            f"Davet ettiğiniz her kullanıcı için <b>+{REFERRAL_REWARD} TL</b> kazanın!\n\n"
             f"👥 Toplam Davet: <b>{u_data.get('invited_count', 0)} Kişi</b>\n"
-            f"💰 Toplam Kazanç: <b>{u_data.get('invited_count', 0) * REFERRAL_REWARD} TL</b>\n\n"
-            f"🔗 <b>Özel Davet Linkiniz:</b>\n<code>{ref_link}</code>"
+            f"💰 Kazanç: <b>{u_data.get('invited_count', 0) * REFERRAL_REWARD} TL</b>\n\n"
+            f"🔗 <b>Davet Linkiniz:</b>\n<code>{ref_link}</code>"
         )
         btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]])
         await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
 
     elif data == "reviews":
-        text = (
-            f"💬 <b>MÜŞTERİ YORUMLARI & GERİ BİLDİRİMLER</b>\n----------------------------------------\n"
-            f"⭐ <b>B***n:</b> <i>\"Instagram alma işlemi 15 dakikada bitti, teşekkürler.\"</i>\n"
-            f"⭐ <b>A***k:</b> <i>\"Canlı konum tespiti %100 doğru nokta verdi, VIP hız muazzam.\"</i>\n"
-            f"⭐ <b>K***t:</b> <i>\"WhatsApp sızma işleminde şüphelerim vardı ama dekont onayından sonra hemen iletildi.\"</i>\n\n"
-            f"📌 Güncel kanıtlar ve canlı yorumlar için duyuru kanalımızı takip edebilirsiniz."
-        )
+        text = "💬 <b>MÜŞTERİ YORUMLARI</b>\n----------------------------------------\n⭐ <b>B***n:</b> <i>'Instagram alma işlemi 15 dakikada bitti.'</i>\n⭐ <b>A***k:</b> <i>'Canlı konum tespiti %100 doğru verdi.'</i>"
         btn = InlineKeyboardMarkup([[InlineKeyboardButton("📢 Duyuru Kanalı", url=f"https://t.me/{REQUIRED_CHANNEL.replace('@', '')}")]])
         await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
 
     elif data == "guarantee":
-        text = (
-            f"🛡 <b>GÜVENLİK & GARANTİ ŞARTLARI</b>\n----------------------------------------\n"
-            f"🔒 <b>Uçtan Uca Gizlilik:</b> Tüm sunucu logları işlem sonrası otomatik silinir.\n"
-            f"💎 <b>Tam İade Garantisi:</b> Başarısız olan işlemlerde bakiyeniz anında iade edilir.\n"
-            f"🕵️‍♂️ <b>Anonimlik:</b> Hedef kişinin işlemden haberdar olması teknik olarak imkansızdır.\n"
-            f"⚡ <b>7/24 Kesintisiz Destek:</b> VIP Müşteri Hizmetlerimiz sürekli aktiftir."
-        )
+        text = "🛡 <b>GÜVENLİK & GARANTİ</b>\n----------------------------------------\n🔒 <b>Gizlilik:</b> Loglar otomatik silinir.\n💎 <b>İade:</b> Başarısız işlemlerde tam iade yapılır."
         btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]])
         await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
 
     elif data == "faq":
-        text = (
-            f"❓ <b>SIKÇA SORULAN SORULAR</b>\n----------------------------------------\n"
-            f"❓ <b>S: İşlemler ne kadar sürer?</b>\n"
-            f"C: Standart işlemler 1-3 saat, Express işlemler 15-30 dakika sürer.\n\n"
-            f"❓ <b>S: Ödeme yaptıktan sonra ne yapmalıyım?</b>\n"
-            f"C: Sipariş adımlarını takip edip dekont fotoğrafınızı sisteme yüklemeniz yeterlidir.\n\n"
-            f"❓ <b>S: Hedef taraf bildirimi alır mı?</b>\n"
-            f"C: Hayır, uyguladığımız sistem tamamen sızma tabanlıdır."
-        )
+        text = "❓ <b>SIKÇA SORULAN SORULAR</b>\n----------------------------------------\n❓ <b>İşlem süresi ne kadar?</b>\nC: Standart 1-3 saat, VIP Express 15-30 dakikadır."
         btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]])
         await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
 
     elif data == "profile":
         u_data = get_user_data(user.id)
         history = u_data.get("history", [])
-        hist_text = "\n".join([f"• {h}" for h in history[-5:]]) if history else "Henüz siparişiniz bulunmuyor."
-
-        text = (
-            f"👤 <b>MÜŞTERİ PROFİLİ</b>\n----------------------------------------\n"
-            f"🆔 <b>Kullanıcı ID:</b> <code>{user.id}</code>\n"
-            f"💰 <b>Mevcut Bakiye:</b> <b>{u_data.get('balance', 0)} TL</b>\n"
-            f"👥 <b>Davet Sayısı:</b> <b>{u_data.get('invited_count', 0)}</b>\n\n"
-            f"📜 <b>Son Sipariş Geçmişi:</b>\n{hist_text}"
-        )
+        hist_text = "\n".join([f"• {h}" for h in history[-5:]]) if history else "Sipariş yok."
+        text = f"👤 <b>MÜŞTERİ PROFİLİ</b>\n----------------------------------------\n🆔 <b>ID:</b> <code>{user.id}</code>\n💰 <b>Bakiye:</b> <b>{u_data.get('balance', 0)} TL</b>\n\n📜 <b>Geçmiş:</b>\n{hist_text}"
         btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Ana Menü", callback_data="back_main")]])
         await query.edit_message_text(text, reply_markup=btn, parse_mode="HTML")
 
     elif data.startswith("adm_"):
         if user.id != ADMIN_ID:
             return
-
         parts = data.split("_")
         action = parts[1]
 
@@ -654,16 +570,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             t_code = parts[3]
             orders = load_json(ORDERS_FILE)
             if t_code in orders:
-                orders[t_code]["status_text"] = "İşleme Alındı / Hazırlanıyor"
+                orders[t_code]["status_text"] = "İşleme Alındı"
                 orders[t_code]["percent"] = "50"
                 save_json(ORDERS_FILE, orders)
-
             try:
-                await context.bot.send_message(
-                    chat_id=target_uid,
-                    text=f"✅ <b>SİPARİŞİNİZ ONAYLANDI!</b>\n\n<code>{t_code}</code> kodlu siparişinizin ödemesi doğrulandı ve işlem başlatıldı.",
-                    parse_mode="HTML"
-                )
+                await context.bot.send_message(chat_id=target_uid, text=f"✅ <code>{t_code}</code> kodlu siparişiniz onaylandı ve başlatıldı.", parse_mode="HTML")
             except Exception:
                 pass
             await query.edit_message_caption(caption=f"{query.message.caption}\n\n✅ <b>ONAYLANDI</b>")
@@ -673,15 +584,161 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             t_code = parts[3]
             orders = load_json(ORDERS_FILE)
             if t_code in orders:
-                orders[t_code]["status_text"] = "Ödeme İptal Edildi / Reddedildi"
+                orders[t_code]["status_text"] = "Reddedildi"
                 save_json(ORDERS_FILE, orders)
-
             try:
-                await context.bot.send_message(
-                    chat_id=target_uid,
-                    text=f"❌ <b>ÖDEMENİZ REDDEDİLDİ!</b>\n\n<code>{t_code}</code> kodlu siparişin dekontu geçersiz görüldü.",
-                    parse_mode="HTML"
-                )
+                await context.bot.send_message(chat_id=target_uid, text=f"❌ <code>{t_code}</code> sipariş ödemesi reddedildi.", parse_mode="HTML")
             except Exception:
                 pass
-            await query.edit_message_caption(caption=f"{query.message.caption}\n\n❌ <b>REDDEDİLDİ</b>")                                
+            await query.edit_message_caption(caption=f"{query.message.caption}\n\n❌ <b>REDDEDİLDİ</b>")
+
+        elif action == "quickban":
+            target_uid = int(parts[2])
+            banned = load_json(BANNED_FILE)
+            banned[str(target_uid)] = True
+            save_json(BANNED_FILE, banned)
+            await query.edit_message_caption(caption=f"{query.message.caption}\n\n🚫 <b>KULLANICI ENGELLENDİ!</b>")# --- ADMİN KOMUTLARI ---
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id != ADMIN_ID:
+        return
+    all_users = load_json(DATA_FILE)
+    all_orders = load_json(ORDERS_FILE)
+    panel_text = f"👑 <b>ADMİN PANELİ</b>\n----------------------------------------\n👥 Müşteri: <code>{len(all_users)}</code>\n📦 Sipariş: <code>{len(all_orders)}</code>\n\n<b>Komutlar:</b>\n/bakiye_ekle ID TUTAR\n/durum KOD YUZDE\n/duyuru Mesaj\n/ban ID\n/unban ID\n/addcoupon KOD MIKTAR LIMIT"
+    await update.message.reply_text(panel_text, parse_mode="HTML")
+
+async def admin_add_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        target_uid = context.args[0]
+        amount = int(context.args[1])
+        data = load_json(DATA_FILE)
+        if target_uid in data:
+            data[target_uid]["balance"] = data[target_uid].get("balance", 0) + amount
+            save_json(DATA_FILE, data)
+            await update.message.reply_text(f"✅ <code>{target_uid}</code> hesabına <b>+{amount} TL</b> eklendi.", parse_mode="HTML")
+            try:
+                await context.bot.send_message(chat_id=int(target_uid), text=f"🎉 Hesabınıza <b>+{amount} TL</b> bakiye yüklendi!", parse_mode="HTML")
+            except Exception:
+                pass
+    except Exception:
+        await update.message.reply_text("⚠️ Kullanım: <code>/bakiye_ekle ID TUTAR</code>", parse_mode="HTML")
+
+async def admin_update_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        track_code = context.args[0].upper()
+        percent = context.args[1]
+        orders = load_json(ORDERS_FILE)
+        if track_code in orders:
+            orders[track_code]["percent"] = percent
+            orders[track_code]["status_text"] = f"İşlem Devam Ediyor (%{percent})"
+            save_json(ORDERS_FILE, orders)
+            await update.message.reply_text(f"✅ <code>{track_code}</code> %{percent} yapıldı.", parse_mode="HTML")
+            try:
+                await context.bot.send_message(chat_id=orders[track_code]["user_id"], text=f"🔄 Siparişiniz %{percent} seviyesine ulaştı.", parse_mode="HTML")
+            except Exception:
+                pass
+    except Exception:
+        await update.message.reply_text("⚠️ Kullanım: <code>/durum CHW-12345 50</code>", parse_mode="HTML")
+
+async def admin_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    msg = " ".join(context.args)
+    if not msg:
+        return
+    users = load_json(DATA_FILE)
+    success = 0
+    for uid in users:
+        try:
+            await context.bot.send_message(chat_id=int(uid), text=f"📢 <b>DUYURU:</b> {msg}", parse_mode="HTML")
+            success += 1
+        except Exception:
+            pass
+    await update.message.reply_text(f"✅ {success} kişiye atıldı.", parse_mode="HTML")
+
+async def admin_ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        target_uid = context.args[0]
+        banned = load_json(BANNED_FILE)
+        banned[str(target_uid)] = True
+        save_json(BANNED_FILE, banned)
+        await update.message.reply_text(f"🚫 {target_uid} banlandı.", parse_mode="HTML")
+    except Exception:
+        pass
+
+async def admin_unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        target_uid = context.args[0]
+        banned = load_json(BANNED_FILE)
+        if str(target_uid) in banned:
+            del banned[str(target_uid)]
+            save_json(BANNED_FILE, banned)
+            await update.message.reply_text(f"✅ {target_uid} ban kaldırıldı.", parse_mode="HTML")
+    except Exception:
+        pass
+
+async def admin_add_coupon(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        code = context.args[0].upper()
+        amount = int(context.args[1])
+        limit = int(context.args[2])
+        coupons = load_json(COUPONS_FILE)
+        coupons[code] = {"amount": amount, "limit": limit, "used_by": []}
+        save_json(COUPONS_FILE, coupons)
+        await update.message.reply_text(f"🎟 <code>{code}</code> kuponu oluşturuldu.", parse_mode="HTML")
+    except Exception:
+        pass
+
+# --- UYGULAMA BAŞLATICI ---
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+
+    target_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(start_target_info, pattern="^proceed_target$")],
+        states={
+            WAITING_TARGET_INFO: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_target_info)],
+            WAITING_DEKONT: [MessageHandler(filters.PHOTO, receive_dekont)]
+        },
+        fallbacks=[CommandHandler("cancel", cancel_conv)]
+    )
+
+    promo_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(start_use_promo, pattern="^use_promo$")],
+        states={WAITING_PROMO: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_promo)]},
+        fallbacks=[CommandHandler("cancel", cancel_conv)]
+    )
+
+    tracking_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(start_track_order, pattern="^track_order$")],
+        states={WAITING_TRACKING: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_track_code)]},
+        fallbacks=[CommandHandler("cancel", cancel_conv)]
+    )
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("admin", admin_panel))
+    app.add_handler(CommandHandler("bakiye_ekle", admin_add_balance))
+    app.add_handler(CommandHandler("durum", admin_update_status))
+    app.add_handler(CommandHandler("duyuru", admin_broadcast))
+    app.add_handler(CommandHandler("ban", admin_ban_user))
+    app.add_handler(CommandHandler("unban", admin_unban_user))
+    app.add_handler(CommandHandler("addcoupon", admin_add_coupon))
+
+    app.add_handler(target_conv)
+    app.add_handler(promo_conv)
+    app.add_handler(tracking_conv)
+    app.add_handler(CallbackQueryHandler(handle_callback))
+
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
