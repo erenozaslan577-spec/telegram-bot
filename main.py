@@ -423,8 +423,10 @@ async def receive_track_code(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return ConversationHandler.END
 
 async def cancel_conv(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("❌ İşlem iptal edildi.", reply_markup=get_main_keyboard())
-    return ConversationHandler.ENDasync def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("❌ İşlem iptal edildi.")
+    return ConversationHandler.END
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user = update.effective_user
     data = query.data
@@ -474,45 +476,6 @@ async def cancel_conv(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['cart'] = set()
         await query.edit_message_text("🛠️ <b>HİZMET SEÇİM PANELİ</b>\n\nLütfen paketlerinizi belirleyin:", reply_markup=build_service_keyboard(set(), express), parse_mode="HTML")
 
-    elif data == "checkout":
-        if not cart:
-            await query.answer("⚠️ Lütfen en az 1 hizmet seçin!", show_alert=True)
-            return
-
-        selected_services = [SERVICES[i] for i in sorted(list(cart))]
-        count = len(selected_services)
-        raw_price = calculate_price(count, express)
-
-        u_data = get_user_data(user.id)
-        balance = u_data.get('balance', 0)
-
-        discount_applied = min(balance, raw_price)
-        final_price = raw_price - discount_applied
-
-        context.user_data['pending_order'] = {
-            'count': count,
-            'services': selected_services,
-            'raw_price': raw_price,
-            'used_discount': discount_applied,
-            'final_price': final_price
-        }
-
-        summary_text = (
-            f"🛒 <b>SEPET ÖZETİ & SEÇİLEN İŞLEMLER</b>\n-----------------------------------\n"
-            + "\n".join([f"• {s}" for s in selected_services]) + "\n\n"
-            f"🚀 <b>Express Teslimat:</b> {'EVET (+300 TL)' if express else 'HAYIR'}\n"
-            f"💰 <b>Tutar:</b> {raw_price} TL\n"
-            f"🎁 <b>Kullanılan Bakiye İndirimi:</b> -{discount_applied} TL\n"
-            f"💳 <b>Ödenecek Net Tutar:</b> <b>{final_price} TL</b>\n\n"
-            f"İşleme devam etmek istiyor musunuz?"
-        )
-
-        btn = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ Siparişi Tamamla & Öde", callback_data="proceed_target")],
-            [InlineKeyboardButton("✏️ Sepeti Düzenle", callback_data="select_services")]
-        ])
-        await query.edit_message_text(summary_text, reply_markup=btn, parse_mode="HTML")
-
     elif data == "purchase":
         text = (
             "💳 <b>BAKİYE YÜKLENE & DİREKT ÖDEME</b>\n-----------------------------------\n"
@@ -520,7 +483,7 @@ async def cancel_conv(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📍 <b>IBAN:</b> <code>TR10 0006 2000 9100 0006 9897 09</code>\n"
             "👤 <b>Alıcı:</b> <code>Garanti Ödeme ve Elektronik Para Hizmetleri A.Ş.</code>\n"
             "🏷️ <b>Açıklama:</b> <code>TANI7786986257878012</code>\n\n"
-            "ℹ️ <i>Ödeme yaptıktan sonra 'Sipariş Tamamla' butonuna basarak dekontunuzu yükleyebilirsiniz.</i>"
+            "ℹ️ <i>Ödeme yaptıktan sonra 'Hizmet Seç ve Sipariş Ver' butonundan siparişinizi tamamlayabilirsiniz.</i>"
         )
         btn = InlineKeyboardMarkup([
             [InlineKeyboardButton("🛍️ Hizmet Seç ve Sipariş Ver", callback_data="select_services")],
@@ -677,8 +640,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🔹 <code>/bakiye_ekle ID TUTAR</code>\n"
         f"🔹 <code>/durum SIPARIS_KODU YUZDE</code>\n"
         f"🔹 <code>/duyuru Mesajınız</code>\n"
-        f"🔹 <code>/ban ID</code> veya <code>/unban ID</code>\n"
-        f"🔹 <code>/addcoupon KOD MIKTAR LIMIT</code>"
+        f"🔹 <code>/ban ID</code> veya <code>/unban ID</code>"
     )
     await update.message.reply_text(panel_text, parse_mode="HTML")
 
@@ -765,7 +727,7 @@ def main():
 
     order_conv_handler = ConversationHandler(
         entry_points=[
-            CallbackQueryHandler(start_target_info, pattern="^proceed_target$")
+            CallbackQueryHandler(start_target_info, pattern="^checkout$")
         ],
         states={
             WAITING_TARGET_INFO: [
@@ -777,8 +739,11 @@ def main():
         },
         fallbacks=[
             CommandHandler("cancel", cancel_conv),
-            CallbackQueryHandler(handle_callback, pattern="^back_main$")
-        ]
+            CommandHandler("start", start),
+            CallbackQueryHandler(handle_callback, pattern="^back_main$"),
+            CallbackQueryHandler(handle_callback, pattern="^select_services$")
+        ],
+        allow_reentry=True
     )
 
     promo_conv_handler = ConversationHandler(
@@ -790,7 +755,11 @@ def main():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_promo)
             ]
         },
-        fallbacks=[CommandHandler("cancel", cancel_conv)]
+        fallbacks=[
+            CommandHandler("cancel", cancel_conv),
+            CommandHandler("start", start)
+        ],
+        allow_reentry=True
     )
 
     tracking_conv_handler = ConversationHandler(
@@ -802,7 +771,11 @@ def main():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_track_code)
             ]
         },
-        fallbacks=[CommandHandler("cancel", cancel_conv)]
+        fallbacks=[
+            CommandHandler("cancel", cancel_conv),
+            CommandHandler("start", start)
+        ],
+        allow_reentry=True
     )
 
     application.add_handler(CommandHandler("start", start))
