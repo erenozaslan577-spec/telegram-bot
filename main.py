@@ -24,7 +24,7 @@ logging.basicConfig(
 )
 
 # --- KONFİGÜRASYON ---
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8674816242:AAGrR4QqS8nQ6jtXi43FCwRvn10bQkVsiow")
+TOKEN = os.getenv("TOKEN")
 ADMIN_USERNAME = "@kralinarest"
 ADMIN_ID = int(os.getenv("ADMIN_ID", "8932488958"))
 BOT_USERNAME = "ChiwasIslenBot"
