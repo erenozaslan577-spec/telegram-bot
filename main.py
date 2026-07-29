@@ -161,7 +161,8 @@ async def check_channel_membership(user_id, context: ContextTypes.DEFAULT_TYPE):
         member = await context.bot.get_chat_member(chat_id=REQUIRED_CHANNEL, user_id=user_id)
         return member.status in ["creator", "administrator", "member"]
     except Exception:
-        return True def get_main_keyboard():
+        return True def
+        get_main_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🛠️ Hizmet Seç & Sepet Oluştur", callback_data="select_services")],
         [InlineKeyboardButton("💳 Bakiye / Ödeme Yap", callback_data="purchase"), InlineKeyboardButton("📜 Hizmet Rehberi", callback_data="guide")],
