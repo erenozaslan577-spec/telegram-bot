@@ -163,7 +163,7 @@ async def check_channel_membership(user_id, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         return True
 
-def get_main_keyboard():
+    def get_main_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🛠️ Hizmet Seç & Sepet Oluştur", callback_data="select_services")],
         [InlineKeyboardButton("💳 Bakiye / Ödeme Yap", callback_data="purchase"), InlineKeyboardButton("📜 Hizmet Rehberi", callback_data="guide")],
