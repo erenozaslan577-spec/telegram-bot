@@ -60,7 +60,9 @@ def save_json(filepath, data):
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
         except Exception as e:
-            logging.error(f"{filepath} kayit hatasi: {e}")def get_user_data(user_id):
+            logging.error(f"{filepath} kaydedilirken hata: {e}")
+
+def get_user_data(user_id):
     data = load_json(DATA_FILE)
     uid = str(user_id)
     if uid not in data:
@@ -69,16 +71,13 @@ def save_json(filepath, data):
             "invited_count": 0,
             "history": [],
             "last_wheel": None
-        }
-        save_json(DATA_FILE, data)
-    return data[uid]
-
-def update_user_data(user_id, key, value):
+        def update_user_data(user_id, key, value):
+    # get_user_data zaten kullanıcı yoksa oluşturup veriyi getiriyor:
+    user_data = get_user_data(user_id) 
+    
+    # Tüm veriyi yükleyip güncelliyoruz
     data = load_json(DATA_FILE)
     uid = str(user_id)
-    if uid not in data:
-        get_user_data(user_id)
-        data = load_json(DATA_FILE)
     data[uid][key] = value
     save_json(DATA_FILE, data)
 
